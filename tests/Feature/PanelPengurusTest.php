@@ -6,6 +6,7 @@ use App\Enums\SesiTugas;
 use App\Enums\StatusPenugasan;
 use App\Livewire\Pengurus\AturJadwal;
 use App\Livewire\Pengurus\Pengawasan;
+use App\Livewire\Pengurus\Rekap;
 use App\Models\MingguPiket;
 use App\Models\Penugasan;
 use App\Models\Tugas;
@@ -54,14 +55,31 @@ class PanelPengurusTest extends TestCase
             ->assertSee('Atur piket Minggu, 22 Nov');
     }
 
-    public function test_warga_biasa_ditolak_dan_pengurus_tanpa_pin_diminta_pin(): void
+    public function test_warga_biasa_ditolak_dan_tamu_diarahkan_ke_login(): void
     {
+        $this->get(route('pengurus.jadwal'))->assertRedirect(route('login'));
+
         $this->actingAs(User::factory()->create());
         $this->get(route('pengurus.pengawasan'))->assertForbidden();
         $this->get(route('pengurus.jadwal'))->assertForbidden();
+    }
 
-        $this->actingAs(User::factory()->pengurus()->denganPin()->create());
-        $this->get(route('pengurus.jadwal'))->assertRedirect(route('pin.masukkan'));
+    public function test_panel_punya_semua_menu_dan_tampilan_warga(): void
+    {
+        $this->masukSebagaiPengurus();
+
+        $this->get(route('pengurus.pengawasan'))->assertOk()->assertSeeInOrder([
+            'Pengawasan', 'Atur jadwal', 'Pengajuan', 'Warga &amp; geng', 'Rekap bulanan', 'Pengaturan', 'TAMPILAN WARGA',
+        ], false);
+    }
+
+    public function test_tampilan_warga_milik_pengurus_punya_tombol_panel_pengurus(): void
+    {
+        $this->masukSebagaiPengurus();
+        $this->get(route('dashboard'))->assertOk()->assertSee('Panel pengurus')->assertSee(route('pengurus.pengawasan'), false);
+
+        $this->actingAs(User::factory()->create());
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('Panel pengurus');
     }
 
     public function test_alur_harian_buat_draf_ubah_lalu_terbitkan(): void
@@ -177,7 +195,7 @@ class PanelPengurusTest extends TestCase
             ]);
         }
 
-        Livewire::test(\App\Livewire\Pengurus\Rekap::class)
+        Livewire::test(Rekap::class)
             ->assertSet('bulan', '2026-11')
             ->assertViewHas('warga', function ($warga) use ($u) {
                 $r = $warga->firstWhere('user.id', $u->id);

@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
             GengSeeder::class,
             TugasSeeder::class,
             PengaturanSeeder::class,
-            WargaContohSeeder::class,
+            WargaSeeder::class,
         ]);
     }
 }

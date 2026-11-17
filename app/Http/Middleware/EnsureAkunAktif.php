@@ -19,7 +19,7 @@ class EnsureAkunAktif
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('beranda')->with('error', 'Akunmu sudah tidak aktif. Hubungi pengurus kalau ini keliru.');
+            return redirect()->route('login')->with('error', 'Akunmu sudah tidak aktif. Hubungi pengurus kalau ini keliru.');
         }
 
         return $next($request);

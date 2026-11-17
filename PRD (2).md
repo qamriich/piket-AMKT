@@ -17,7 +17,7 @@ Aplikasi web berbasis Laravel untuk menyusun, membagikan, dan memantau jadwal pi
 **Tujuan**
 
 - Pengurus cukup memilih tugas yang aktif, lalu sistem membagi petugasnya secara otomatis dan bergilir.
-- Setiap warga bisa melihat jadwalnya sendiri tanpa login dan mendapat email setiap kali jadwal diterbitkan.
+- Setiap warga bisa login dengan email, melihat jadwalnya sendiri, dan mendapat email setiap kali jadwal diterbitkan.
 - Utang piket (bintang) tercatat otomatis dan dijadwalkan ulang tanpa membuat tugas ganda.
 - Pengurus bisa melihat rekap bulanan per warga.
 
@@ -27,7 +27,7 @@ Aplikasi web berbasis Laravel untuk menyusun, membagikan, dan memantau jadwal pi
 
 ## 2. Pengguna, peran, dan akses
 
-Semua orang, termasuk pengurus, masuk lewat **link pribadi**, tanpa halaman login. Sistem mengenali pengurus dari kolom `role` di akun mereka, bukan dari cara masuknya. Akun dibuat oleh pengurus, lalu sistem mengirim link pribadi ke email warga tersebut.
+Semua orang masuk lewat **halaman login dengan email dan password**, seperti web kampus. Akun dibuat oleh pengurus: pengurus mendaftarkan email warga dan menentukan role-nya. Sistem mengenali siapa yang login dari emailnya, lalu mengarahkan sesuai role.
 
 | Peran | Siapa | Hak akses |
 | --- | --- | --- |
@@ -38,13 +38,15 @@ Semua orang, termasuk pengurus, masuk lewat **link pribadi**, tanpa halaman logi
 
 Pengurus juga anggota geng dan ikut piket, jadi pengurus punya dashboard warga sekaligus menu pengurus.
 
-**Mekanisme link pribadi**
+**Mekanisme login (revisi 17 Nov 2026, menggantikan link pribadi dan PIN)**
 
-1. Saat akun dibuat, sistem membuat token acak 64 karakter dan menyimpan hash-nya di tabel `users`.
-2. Link `https://<domain>/m/<token>` dikirim ke email warga. Saat dibuka, sistem membuat sesi login (cookie "ingat saya" selama 1 tahun), lalu mengarahkan ke dashboard.
-3. Kalau link hilang atau bocor, pengurus bisa menekan tombol "Kirim ulang link" yang membuat token baru dan menonaktifkan token lama.
-4. Pengurus wajib membuat **PIN 6 digit** saat pertama kali membuka menu pengurus. PIN ini diminta lagi setiap sesi baru, supaya link pengurus yang bocor tidak langsung memberi akses admin.
-5. Akun pengurus pertama (Tata Tertib) dibuat lewat seeder atau perintah `php artisan app:create-admin`.
+1. Pengurus menambah warga di halaman Warga & geng: nama, email, kamar, geng, role, dan wajib diperiksa. Tidak ada pendaftaran mandiri.
+2. Saat akun dibuat, sistem mengirim email "Buat password" berisi link yang berlaku 7 hari. Warga membuka link itu dan membuat password sendiri.
+3. Halaman login berisi email, password, dan centang "Ingat saya" (sesi bertahan 30 hari). Ada link "Lupa password" yang mengirim email reset.
+4. Setelah login, role warga diarahkan ke Beranda warga, sedangkan role pengurus (ketua, sekretaris, bendahara, tata_tertib) diarahkan ke panel pengurus (Pengawasan). Pengurus tetap bisa membuka tampilan warga lewat menu "Tampilan warga", dan di tampilan warga milik pengurus ada tombol "Panel pengurus" di header.
+5. Pengurus bisa menekan "Kirim ulang email buat password" untuk warga yang belum pernah login atau lupa.
+6. Akun pengurus pertama (Tata Tertib) dibuat lewat seeder atau perintah `php artisan app:create-admin`.
+7. Login dibatasi 5 percobaan gagal per menit. Warga yang dinonaktifkan tidak bisa login.
 
 **Penanda warga wajib diperiksa:** kolom `wajib_diperiksa` (boolean) di akun warga, diubah oleh pengurus. Kolom ini tidak tampil sebagai label khusus bagi warga.
 
@@ -69,7 +71,7 @@ Pengurus juga anggota geng dan ikut piket, jadi pengurus punya dashboard warga s
 **F1. Kelola warga** (pengurus)
 
 - Tambah, ubah, dan nonaktifkan warga. Data yang diisi: nama, email, nomor kamar, geng, role (warga, ketua, sekretaris, bendahara, tata_tertib), dan `wajib_diperiksa`.
-- Kirim atau kirim ulang link pribadi.
+- Kirim ulang email buat password atau reset password.
 - Warga yang nonaktif (misalnya sudah keluar asrama) tidak ikut penjadwalan, tapi riwayatnya tetap tersimpan.
 
 **F2. Kelola geng dan rotasi** (pengurus)
@@ -184,7 +186,7 @@ Ada 9 tabel inti, ditambah tabel bawaan Laravel (`sessions`, `jobs`, `cache`).
 
 | Tabel | Kolom penting | Keterangan |
 | --- | --- | --- |
-| `users` | id, nama, email (unik), no_kamar, geng_id, role (enum: warga, ketua, sekretaris, bendahara, tata_tertib), wajib_diperiksa (bool), aktif (bool), token_hash, pin_hash (nullable) | Warga dan pengurus ada di satu tabel |
+| `users` | id, nama, email (unik), no_kamar, geng_id, role (enum: warga, ketua, sekretaris, bendahara, tata_tertib), wajib_diperiksa (bool), aktif (bool), password (hash), email_verified_at, remember_token | Warga dan pengurus ada di satu tabel |
 | `gengs` | id, nama (Geng 1–3), urutan | Isinya hanya 3 baris |
 | `jadwal_kuliah` | id, user_id, hari (1–7), jam_mulai, jam_selesai | Dipakai oleh B2 |
 | `tugas` | id, nama, jenis (harian / kamis_minggu), urutan, aktif_default (bool) | Master daftar tugas |
@@ -213,7 +215,7 @@ Tampilan dirancang mobile-first karena kebanyakan warga membuka lewat HP. Gunaka
 | Pengawasan | Pengurus | Daftar piket hari ini dan minggu ini, filter, tombol tandai selesai atau batalkan, dan kolom catatan. Warga yang wajib diperiksa diurutkan di atas |
 | Atur jadwal | Pengurus | Pilih minggu, lalu tiga tab: Harian (draf B2 yang bisa diubah), Kamis (toggle tugas), dan Minggu (pilih mode dan toggle tugas). Ada tombol Buat pembagian, pratinjau, tukar petugas, dan Terbitkan |
 | Pengajuan | Pengurus | Daftar pengajuan ganti bintang dengan tombol Terima atau Tolak |
-| Warga & geng | Pengurus | CRUD warga, pindah geng, ubah role, atur wajib diperiksa, dan kirim ulang link |
+| Warga & geng | Pengurus | CRUD warga, pindah geng, ubah role, atur wajib diperiksa, dan kirim ulang email buat password |
 | Master tugas | Pengurus | CRUD daftar tugas |
 | Rekap bulanan | Pengurus | Tabel per warga dan tombol ekspor |
 | Pengaturan | Pengurus | Minggu acuan, geng acuan, dan batas jam kuliah |
@@ -249,11 +251,11 @@ Prioritas utamanya: warga yang tidak melek teknologi bisa memakai web ini **tanp
 
 ## 8. Notifikasi email
 
-Semua email dikirim lewat queue Laravel memakai Mailable berbahasa Indonesia, dan setiap email berisi link pribadi ke dashboard.
+Semua email dikirim lewat queue Laravel memakai Mailable berbahasa Indonesia, dan setiap email berisi link ke web.
 
 | Pemicu | Penerima | Isi |
 | --- | --- | --- |
-| Akun dibuat atau link dikirim ulang | Warga tersebut | Link pribadi |
+| Akun dibuat atau email dikirim ulang | Warga tersebut | Link untuk membuat password |
 | Jadwal harian, Kamis, atau Minggu diterbitkan | Semua warga aktif | Piket penerima (termasuk Bayar Bintang) dan tenggatnya, atau info "minggu ini kamu bebas" |
 | Jadwal diubah setelah terbit | Warga yang terdampak | Perubahan tugas |
 | Pengingat | Petugas yang belum selesai | Harian: malam sebelumnya jam 20.00. Kamis: Jumat jam 12.00. Minggu: Senin jam 12.00 |
@@ -277,9 +279,9 @@ Laravel bisa jalan di Vercel, tapi lewat runtime PHP buatan komunitas (`vercel-p
 **Kebutuhan non-fungsional**
 
 - Halaman dashboard terbuka dalam waktu kurang dari 2 detik lewat koneksi HP.
-- Token link pribadi disimpan sebagai hash. Route pengurus dilindungi middleware role dan PIN. Route `/cron/tick` dilindungi secret.
+- Password disimpan sebagai hash (bcrypt). Route pengurus dilindungi middleware role. Route `/cron/tick` dilindungi secret.
 - Semua aksi pengurus (terbitkan, tukar petugas, ubah status, setujui pengajuan) dicatat di log aktivitas.
-- Aplikasi menyertakan seeder dengan data contoh: 3 geng, 20 warga biasa, 4 pengurus (1 orang per role), dan daftar tugas bawaan.
+- Aplikasi menyertakan seeder dengan data contoh: data asli 15 orang (lihat bagian 13), dan daftar tugas bawaan.
 - Unit test wajib untuk B1, B2, B3, B4, dan B5.
 
 Kalau deploy ke Vercel terlalu merepotkan, alternatif yang lebih mudah untuk Laravel adalah Railway, Render, atau hosting PHP biasa yang sudah punya cron dan MySQL.
@@ -301,7 +303,7 @@ Sumber: [Vercel Cron usage and pricing](https://vercel.com/docs/cron-jobs/usage-
 
 ## 11. Tahapan pengerjaan (4 minggu)
 
-1. **Minggu 1, fondasi:** setup Laravel dan database, migrasi, seeder, link pribadi dan PIN, CRUD warga, geng, dan master tugas, serta pengaturan rotasi.
+1. **Minggu 1, fondasi:** setup Laravel dan database, migrasi, seeder, login email dan password, CRUD warga, geng, dan master tugas, serta pengaturan rotasi.
 2. **Minggu 2, penjadwalan:** jadwal kuliah, draf harian (B2), toggle Kamis dan Minggu, penugasan otomatis (B3), terbitkan jadwal, dan unit test.
 3. **Minggu 3, pelaksanaan:** dashboard warga, tandai selesai dan pemeriksaan, catatan, bintang otomatis dan pelunasan (B4, B5), pengajuan ganti bintang, serta email.
 4. **Minggu 4, penyelesaian:** dashboard pengawasan, rekap dan ekspor, deploy ke Vercel beserta cron eksternal, uji coba dengan data asli, dan perbaikan.
@@ -314,3 +316,31 @@ Semua pertanyaan terbuka sudah dijawab pengurus pada 16 November 2026.
 - **Bintang harian** tidak punya batas waktu bayar dan tetap tercatat sebagai utang sampai dibayar.
 - **Satu hari piket harian** hanya boleh diisi 1 orang. Kalau anggota geng lebih dari 7, sisanya diatur manual oleh pengurus.
 - **`batas_jam_kuliah` = 09.00.** Warga yang kuliahnya dimulai sebelum jam 09.00 tidak dijadwalkan piket harian pada hari itu.
+
+## 13. Data warga awal (untuk seeder)
+
+Nama panggilan saja. Email sementara `<nama>@amkt.test`, diganti pengurus dari halaman Warga & geng. Nomor kamar dikosongkan.
+
+| Nama | Role | Geng | Wajib diperiksa |
+| --- | --- | --- | --- |
+| Gita | ketua | 1 | tidak |
+| Qamri | sekretaris | 1 | tidak |
+| Adel | bendahara | 3 | tidak |
+| Wilda | tata_tertib | 3 | tidak |
+| Ping | warga | 2 | tidak |
+| Ain | warga | 3 | tidak |
+| Pipi | warga | 2 | tidak |
+| Fika | warga | 3 | tidak |
+| Nivia | warga | 2 | ya |
+| Niya | warga | 3 | ya |
+| Eca | warga | 2 | ya |
+| Dilla | warga | 1 | ya |
+| Dewi | warga | 1 | ya |
+| Kia | warga | 2 | ya |
+| Septi | warga | 1 | tidak |
+
+## 14. Tampilan responsif
+
+- HP (< 768 px): layout satu kolom seperti desain-warga.html, dengan 5 tab ikon di bawah header.
+- Laptop (≥ 1024 px): web warga menjadi dashboard lebar. Navbar atas berisi logo, 5 menu teks dengan ikon, dan avatar. Konten maksimal 1200 px di tengah. Bagian atas Beranda dibagi 2 kolom (sapaan di kiri, kartu bento di kanan), kartu "Yang perlu kamu tahu" disusun 2 kolom, dan jadwal tampil sebagai tabel lebar.
+- Panel pengurus memakai sidebar di laptop dan menu bawah di HP, seperti desain-pengurus.html.

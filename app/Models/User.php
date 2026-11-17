@@ -3,20 +3,17 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Notifications\TautanPassword;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
-
-    public const PANJANG_TOKEN = 64;
 
     protected $fillable = [
         'nama',
@@ -29,8 +26,7 @@ class User extends Authenticatable
     ];
 
     protected $hidden = [
-        'token_hash',
-        'pin_hash',
+        'password',
         'remember_token',
     ];
 
@@ -40,14 +36,9 @@ class User extends Authenticatable
             'role' => Role::class,
             'wajib_diperiksa' => 'boolean',
             'aktif' => 'boolean',
-            'token_dibuat_pada' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
         ];
-    }
-
-    // Tidak ada password: masuk hanya lewat link pribadi.
-    public function getAuthPassword(): string
-    {
-        return '';
     }
 
     public function geng(): BelongsTo
@@ -85,6 +76,24 @@ class User extends Authenticatable
         return $this->role->isPengurus();
     }
 
+    /** Sudah membuat password (bisa login). */
+    public function punyaPassword(): bool
+    {
+        return $this->password !== null;
+    }
+
+    /** Halaman tujuan setelah login: pengurus ke Pengawasan, warga ke Beranda (PRD bagian 2 poin 4). */
+    public function halamanAwal(): string
+    {
+        return $this->isPengurus() ? route('pengurus.pengawasan') : route('dashboard');
+    }
+
+    /** Email "Lupa password" (dikirim oleh password broker Laravel), berbahasa Indonesia. */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new TautanPassword($token, TautanPassword::RESET));
+    }
+
     public function namaDepan(): string
     {
         return (string) strtok((string) $this->nama, ' ');
@@ -93,60 +102,5 @@ class User extends Authenticatable
     public function inisial(): string
     {
         return mb_strtoupper(mb_substr(trim((string) $this->nama), 0, 1));
-    }
-
-    public static function hashToken(string $token): string
-    {
-        return hash('sha256', $token);
-    }
-
-    public static function cariLewatToken(string $token): ?self
-    {
-        if (strlen($token) !== self::PANJANG_TOKEN) {
-            return null;
-        }
-
-        return static::query()
-            ->where('token_hash', self::hashToken($token))
-            ->where('aktif', true)
-            ->first();
-    }
-
-    /**
-     * Membuat token link pribadi baru. Token lama otomatis tidak berlaku lagi,
-     * dan semua cookie "ingat saya" yang lama ikut diputus.
-     * Mengembalikan token asli (hanya ada di memori, tidak disimpan).
-     */
-    public function buatTokenBaru(): string
-    {
-        $token = Str::random(self::PANJANG_TOKEN);
-
-        $this->forceFill([
-            'token_hash' => self::hashToken($token),
-            'token_dibuat_pada' => now(),
-            'remember_token' => Str::random(60),
-        ])->save();
-
-        return $token;
-    }
-
-    public static function linkPribadi(string $token): string
-    {
-        return route('link.masuk', ['token' => $token]);
-    }
-
-    public function punyaPin(): bool
-    {
-        return $this->pin_hash !== null;
-    }
-
-    public function setPin(string $pin): void
-    {
-        $this->forceFill(['pin_hash' => Hash::make($pin)])->save();
-    }
-
-    public function cekPin(string $pin): bool
-    {
-        return $this->pin_hash !== null && Hash::check($pin, $this->pin_hash);
     }
 }

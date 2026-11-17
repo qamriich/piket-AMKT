@@ -2,7 +2,7 @@
     use App\Enums\JenisPenugasan;
     use App\Enums\StatusPenugasan;
 @endphp
-<div class="halaman flex flex-col gap-3.5 px-4 pb-8 pt-5">
+<div class="halaman flex flex-col gap-3.5 px-4 pb-8 pt-5 lg:px-0 lg:pt-8">
     <div class="flex flex-col gap-1">
         <h1 class="m-0 text-[26px] font-extrabold text-tinta">Utang piket</h1>
         <p class="m-0 text-[15px] leading-normal text-abu-tua">
@@ -11,6 +11,7 @@
         </p>
     </div>
 
+    <div class="grid gap-3.5 lg:grid-cols-2 lg:items-start">
     @forelse ($bintang as $i => $b)
         @php
             $belumLunas = $b->status === StatusPenugasan::Bintang;
@@ -96,7 +97,7 @@
             </div>
         @endif
     @empty
-        <div class="kartu flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <div class="kartu flex flex-col items-center gap-3 px-6 py-10 text-center lg:col-span-2">
             <span class="letup flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">
                 <x-ikon nama="centang" :ukuran="30" :tebal="2.5" class="centang-gambar" />
             </span>
@@ -104,4 +105,5 @@
             <p class="m-0 max-w-xs text-[15px] leading-normal text-abu-tua">Pertahankan, ya! Selesaikan piket sebelum batas waktunya supaya tidak jadi bintang.</p>
         </div>
     @endforelse
+    </div>
 </div>

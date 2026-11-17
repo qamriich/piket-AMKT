@@ -7,7 +7,7 @@ use App\Livewire\Concerns\KhususPengurus;
 use App\Models\Geng;
 use App\Models\LogAktivitas;
 use App\Models\User;
-use App\Services\LinkPribadi;
+use App\Services\AkunPassword;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -72,22 +72,21 @@ class WargaIndex extends Component
             : "{$warga->nama} dinonaktifkan dan tidak akan ikut penjadwalan.");
     }
 
-    /** Kirim ulang link: token baru dibuat dan token lama tidak berlaku lagi. */
-    public function kirimLink(int $wargaId, LinkPribadi $linkPribadi): void
+    /** Kirim ulang email "Buat password" (berlaku 7 hari). Link sebelumnya tidak berlaku lagi. */
+    public function kirimBuatPassword(int $wargaId, AkunPassword $akun): void
     {
         $warga = User::query()->findOrFail($wargaId);
 
         if (! $warga->aktif) {
-            $this->toast('Aktifkan akun ini dulu sebelum mengirim link.', 'gagal');
+            $this->toast('Aktifkan akun ini dulu sebelum mengirim email.', 'gagal');
 
             return;
         }
 
-        $sudahPernah = $warga->token_hash !== null;
-        $linkPribadi->kirim($warga, kirimUlang: $sudahPernah);
-        LogAktivitas::catat('warga.link_dikirim', $warga, ['kirim_ulang' => $sudahPernah]);
+        $akun->kirimBuatPassword($warga);
+        LogAktivitas::catat('warga.email_buat_password', $warga, ['sudah_punya_password' => $warga->punyaPassword()]);
 
-        $this->toast("Link pribadi baru sedang dikirim ke {$warga->email}. Link lama sudah tidak berlaku.");
+        $this->toast("Email buat password sedang dikirim ke {$warga->email}.");
     }
 
     public function render()

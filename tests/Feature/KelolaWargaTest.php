@@ -5,11 +5,11 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Livewire\Pengurus\WargaForm;
 use App\Livewire\Pengurus\WargaIndex;
-use App\Mail\LinkPribadiMail;
 use App\Models\LogAktivitas;
 use App\Models\User;
+use App\Notifications\TautanPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -21,7 +21,7 @@ class KelolaWargaTest extends TestCase
     {
         parent::setUp();
         $this->buatGeng();
-        Mail::fake();
+        Notification::fake();
     }
 
     private function isiForm($komponen, array $timpa = [])
@@ -33,7 +33,7 @@ class KelolaWargaTest extends TestCase
             'geng_id' => $this->geng(2)->id,
             'role' => 'warga',
             'wajib_diperiksa' => true,
-            'kirim_link' => true,
+            'kirim_email' => true,
         ], $timpa);
 
         foreach ($data as $k => $v) {
@@ -43,7 +43,7 @@ class KelolaWargaTest extends TestCase
         return $komponen;
     }
 
-    public function test_tambah_warga_dan_kirim_link(): void
+    public function test_tambah_warga_dan_kirim_email_buat_password(): void
     {
         $this->masukSebagaiPengurus();
 
@@ -57,20 +57,34 @@ class KelolaWargaTest extends TestCase
         $this->assertSame($this->geng(2)->id, $warga->geng_id);
         $this->assertTrue($warga->wajib_diperiksa);
         $this->assertTrue($warga->aktif);
-        $this->assertNotNull($warga->token_hash);
+        $this->assertFalse($warga->punyaPassword());
 
-        Mail::assertQueued(LinkPribadiMail::class, fn ($m) => $m->hasTo('gita@contoh.test') && ! $m->kirimUlang);
+        Notification::assertSentTo($warga, TautanPassword::class, fn (TautanPassword $n) => $n->jenis === TautanPassword::BUAT
+            && str_contains($n->url($warga), '/password/buat/'));
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'gita@contoh.test']);
         $this->assertTrue(LogAktivitas::query()->where('aksi', 'warga.dibuat')->exists());
     }
 
-    public function test_tambah_warga_tanpa_kirim_link(): void
+    public function test_tambah_warga_tanpa_kirim_email(): void
     {
         $this->masukSebagaiPengurus();
 
-        $this->isiForm(Livewire::test(WargaForm::class), ['kirim_link' => false])->call('simpan')->assertHasNoErrors();
+        $this->isiForm(Livewire::test(WargaForm::class), ['kirim_email' => false])->call('simpan')->assertHasNoErrors();
 
-        Mail::assertNothingQueued();
-        $this->assertNull(User::query()->where('email', 'gita@contoh.test')->value('token_hash'));
+        Notification::assertNothingSent();
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'gita@contoh.test']);
+    }
+
+    public function test_kirim_ulang_email_buat_password_dari_warga_dan_geng(): void
+    {
+        $this->masukSebagaiPengurus();
+        $warga = User::factory()->tanpaPassword()->create(['geng_id' => $this->geng(2)->id]);
+
+        $this->get(route('pengurus.warga.index'))->assertSee('Belum buat password')->assertSee('Kirim ulang email buat password');
+        Livewire::test(WargaIndex::class)->call('kirimBuatPassword', $warga->id)->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'sukses');
+
+        Notification::assertSentTo($warga, TautanPassword::class, fn (TautanPassword $n) => $n->jenis === TautanPassword::BUAT);
+        $this->assertTrue(LogAktivitas::query()->where('aksi', 'warga.email_buat_password')->exists());
     }
 
     public function test_validasi_email_unik_dan_role_valid(): void
@@ -148,14 +162,14 @@ class KelolaWargaTest extends TestCase
         $this->assertSame(Role::TataTertib, $saya->fresh()->role);
     }
 
-    public function test_tidak_bisa_kirim_link_ke_warga_nonaktif(): void
+    public function test_tidak_bisa_kirim_email_ke_warga_nonaktif(): void
     {
         $this->masukSebagaiPengurus();
         $warga = User::factory()->nonaktif()->create();
 
-        Livewire::test(WargaIndex::class)->call('kirimLink', $warga->id)
+        Livewire::test(WargaIndex::class)->call('kirimBuatPassword', $warga->id)
             ->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
-        Mail::assertNothingQueued();
+        Notification::assertNothingSent();
     }
 
     public function test_halaman_daftar_dan_form_tampil(): void
@@ -193,13 +207,14 @@ class KelolaWargaTest extends TestCase
             '--nama' => 'Rina Anggraini',
             '--email' => 'rina@contoh.test',
             '--geng' => 1,
-        ])->expectsOutputToContain('Link pribadi:')->assertSuccessful();
+        ])->expectsOutputToContain('Link buat password:')->assertSuccessful();
 
         $admin = User::query()->where('email', 'rina@contoh.test')->firstOrFail();
         $this->assertSame(Role::TataTertib, $admin->role);
         $this->assertSame($this->geng(1)->id, $admin->geng_id);
-        $this->assertNotNull($admin->token_hash);
-        $this->assertNull($admin->pin_hash);
+        $this->assertFalse($admin->punyaPassword());
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'rina@contoh.test']);
+        Notification::assertNothingSent(); // tanpa --kirim, link hanya ditampilkan
     }
 
     public function test_create_admin_menolak_email_ganda(): void

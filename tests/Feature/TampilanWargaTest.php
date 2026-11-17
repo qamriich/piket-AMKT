@@ -2,21 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SesiTugas;
 use App\Livewire\JadwalKuliahEditor;
 use App\Livewire\Pengurus\AturJadwal;
 use App\Livewire\Warga\Profil;
-use App\Mail\LinkPribadiMail;
 use App\Models\JadwalKuliah;
 use App\Models\Penugasan;
 use App\Models\Tugas;
 use App\Models\User;
+use App\Notifications\TautanPassword;
 use App\Services\DrafHarian;
 use App\Services\JadwalMinggu;
 use App\Services\PenugasanOtomatis;
+use App\Services\RingkasanWarga;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TugasSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -47,9 +49,9 @@ class TampilanWargaTest extends TestCase
         $layanan = app(JadwalMinggu::class);
         $minggu = $layanan->siapkan(now());
         foreach (Tugas::query()->where('jenis', 'kamis_minggu')->get() as $t) {
-            $layanan->ubahTugasAktif($minggu, \App\Enums\SesiTugas::Kamis, $t, in_array($t->nama, ['WC 1', 'WC 2'], true));
+            $layanan->ubahTugasAktif($minggu, SesiTugas::Kamis, $t, in_array($t->nama, ['WC 1', 'WC 2'], true));
         }
-        app(PenugasanOtomatis::class)->bagikan($minggu, \App\Enums\SesiTugas::Kamis);
+        app(PenugasanOtomatis::class)->bagikan($minggu, SesiTugas::Kamis);
         if ($terbit) {
             $layanan->terbitkan($minggu, 'kamis');
         }
@@ -133,7 +135,7 @@ class TampilanWargaTest extends TestCase
         app(JadwalMinggu::class)->aturHarian($minggu, CarbonImmutable::parse('2026-11-21', 'Asia/Makassar'), $a);
         app(JadwalMinggu::class)->terbitkan($minggu, 'harian');
 
-        $kosong = app(\App\Services\RingkasanWarga::class)->tanggalKosong()->map->toDateString()->all();
+        $kosong = app(RingkasanWarga::class)->tanggalKosong()->map->toDateString()->all();
 
         // Hari ini Kamis 19 Nov: yang tersisa Jumat 20 dan Minggu 22 (Sabtu 21 sudah terisi).
         $this->assertSame(['2026-11-20', '2026-11-22'], $kosong);
@@ -177,23 +179,18 @@ class TampilanWargaTest extends TestCase
         Livewire::test(JadwalKuliahEditor::class, ['userId' => $orang->id])->assertForbidden();
     }
 
-    public function test_kirim_ulang_link_sendiri_ke_email_terdaftar_dan_dibatasi(): void
+    public function test_ganti_password_dari_profil_mengirim_link_ke_email_sendiri_dan_dibatasi(): void
     {
-        Mail::fake();
+        Notification::fake();
         $saya = User::factory()->create(['email' => 'ping@contoh.test']);
-        $tokenLama = $saya->buatTokenBaru();
         $this->actingAs($saya);
 
-        Livewire::test(Profil::class)->call('kirimUlangLink')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'sukses');
-        Mail::assertQueued(LinkPribadiMail::class, fn ($m) => $m->hasTo('ping@contoh.test') && $m->kirimUlang);
-        $this->assertAuthenticatedAs($saya);
+        Livewire::test(Profil::class)->call('kirimGantiPassword')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'sukses');
+        Notification::assertSentTo($saya, TautanPassword::class, fn (TautanPassword $n) => $n->jenis === TautanPassword::RESET);
 
         // Percobaan kedua dalam 10 menit ditolak.
-        Livewire::test(Profil::class)->call('kirimUlangLink')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
-        Mail::assertQueuedCount(1);
-
-        auth()->logout();
-        $this->get("/m/{$tokenLama}")->assertNotFound();
+        Livewire::test(Profil::class)->call('kirimGantiPassword')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
+        Notification::assertSentToTimes($saya, TautanPassword::class, 1);
     }
 
     public function test_warga_biasa_tidak_bisa_menjalankan_komponen_pengurus(): void

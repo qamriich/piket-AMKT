@@ -6,7 +6,7 @@ use App\Enums\Role;
 use App\Models\Geng;
 use App\Models\LogAktivitas;
 use App\Models\User;
-use App\Services\LinkPribadi;
+use App\Services\AkunPassword;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 
@@ -14,7 +14,7 @@ use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 /**
- * Membuat akun pengurus pertama (Tata Tertib), PRD bagian 2 poin 5.
+ * Membuat akun pengurus pertama (Tata Tertib), PRD bagian 2 poin 6.
  */
 class CreateAdmin extends Command
 {
@@ -23,11 +23,11 @@ class CreateAdmin extends Command
         {--email= : Email}
         {--kamar= : Nomor kamar}
         {--geng= : Urutan geng (1-3)}
-        {--kirim : Kirim link pribadi lewat email (lewat antrean)}';
+        {--kirim : Kirim email "Buat password" (lewat antrean)}';
 
-    protected $description = 'Membuat akun pengurus Tata Tertib dan menampilkan link pribadinya';
+    protected $description = 'Membuat akun pengurus Tata Tertib dan menampilkan link untuk membuat password';
 
-    public function handle(LinkPribadi $linkPribadi): int
+    public function handle(AkunPassword $akun): int
     {
         // Kalau nama dan email sudah diberikan lewat opsi, jangan tanya hal yang opsional.
         $modeTanya = ! $this->option('nama') || ! $this->option('email');
@@ -72,12 +72,12 @@ class CreateAdmin extends Command
             'aktif' => true,
         ]);
 
-        $url = $this->option('kirim') ? $linkPribadi->kirim($user) : $linkPribadi->buat($user);
+        $url = $this->option('kirim') ? $akun->kirimBuatPassword($user) : $akun->linkBuatPassword($user);
         LogAktivitas::catat('admin.dibuat_lewat_artisan', $user);
 
         $this->info("Akun Tata Tertib untuk {$user->nama} dibuat.");
-        $this->line("Link pribadi: {$url}");
-        $this->warn('Simpan link ini baik-baik. Saat pertama membuka menu pengurus, kamu akan diminta membuat PIN 6 digit.');
+        $this->line("Link buat password: {$url}");
+        $this->warn('Link berlaku 7 hari. Setelah membuat password, login di /login dengan email ini.');
 
         return self::SUCCESS;
     }

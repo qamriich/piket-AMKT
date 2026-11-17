@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Middleware\EnsureAkunAktif;
+use App\Http\Middleware\EnsurePengurus;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,17 +15,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'pengurus' => \App\Http\Middleware\EnsurePengurus::class,
-            'pin' => \App\Http\Middleware\RequirePin::class,
+            'pengurus' => EnsurePengurus::class,
         ]);
 
         $middleware->web(append: [
-            \App\Http\Middleware\EnsureAkunAktif::class,
+            EnsureAkunAktif::class,
         ]);
 
-        // Tidak ada halaman login: tamu diarahkan ke beranda.
-        $middleware->redirectGuestsTo(fn () => route('beranda'));
-        $middleware->redirectUsersTo(fn () => route('dashboard'));
+        // Tamu ke halaman login; yang sudah login (misalnya membuka /login lagi) ke halaman sesuai role.
+        $middleware->redirectGuestsTo(fn () => route('login'));
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->halamanAwal() ?? route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

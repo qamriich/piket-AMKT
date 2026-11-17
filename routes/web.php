@@ -1,22 +1,30 @@
 <?php
 
-use App\Http\Controllers\LinkMasukController;
-use App\Http\Controllers\PinController;
+use App\Http\Controllers\KeluarController;
+use App\Livewire\Auth;
 use App\Livewire\Pengurus;
 use App\Livewire\Warga;
 use Illuminate\Support\Facades\Route;
 
+// Beranda: tamu ke halaman login, yang sudah login ke halaman sesuai role.
 Route::get('/', function () {
-    return auth()->check() ? redirect()->route('dashboard') : view('beranda');
+    return auth()->check() ? redirect(auth()->user()->halamanAwal()) : redirect()->route('login');
 })->name('beranda');
 
-// Link pribadi: satu-satunya cara masuk.
-Route::get('/m/{token}', [LinkMasukController::class, 'masuk'])
-    ->middleware('throttle:20,1')
-    ->name('link.masuk');
+// Login email + password (PRD bagian 2). Tidak ada pendaftaran sendiri.
+Route::middleware('guest')->group(function () {
+    Route::get('/login', Auth\Login::class)->name('login');
+    Route::get('/lupa-password', Auth\LupaPassword::class)->name('password.request');
+});
+
+// Link dari email. Tidak memakai middleware guest supaya tetap bisa dibuka walau di perangkat itu ada akun lain yang sedang masuk.
+Route::middleware('throttle:20,1')->group(function () {
+    Route::get('/password/buat/{token}', Auth\AturPassword::class)->name('password.buat');
+    Route::get('/password/reset/{token}', Auth\AturPassword::class)->name('password.reset');
+});
 
 Route::middleware('auth')->group(function () {
-    Route::post('/keluar', [LinkMasukController::class, 'keluar'])->name('keluar');
+    Route::post('/keluar', KeluarController::class)->name('keluar');
 
     // Web warga: 5 tab + profil (Livewire, tanpa reload).
     Route::get('/dashboard', Warga\Beranda::class)->name('dashboard');
@@ -26,16 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/kuliah', Warga\Kuliah::class)->name('warga.kuliah');
     Route::get('/profil', Warga\Profil::class)->name('warga.profil');
 
-    // PIN pengurus.
-    Route::middleware('pengurus')->prefix('pin')->name('pin.')->group(function () {
-        Route::get('/buat', [PinController::class, 'buat'])->name('buat');
-        Route::post('/buat', [PinController::class, 'simpan'])->name('simpan');
-        Route::get('/', [PinController::class, 'masukkan'])->name('masukkan');
-        Route::post('/', [PinController::class, 'verifikasi'])->name('verifikasi');
-    });
-
-    // Panel pengurus: role pengurus + PIN. Aksi Livewire ikut dicek lewat persistent middleware.
-    Route::middleware(['pengurus', 'pin'])->prefix('pengurus')->name('pengurus.')->group(function () {
+    // Panel pengurus: hanya role pengurus. Aksi Livewire ikut dicek lewat persistent middleware.
+    Route::middleware('pengurus')->prefix('pengurus')->name('pengurus.')->group(function () {
         Route::get('/', Pengurus\Pengawasan::class)->name('pengawasan');
         Route::get('/jadwal', Pengurus\AturJadwal::class)->name('jadwal');
         Route::get('/pengajuan', Pengurus\Pengajuan::class)->name('pengajuan');

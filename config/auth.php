@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -39,8 +41,8 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
-            // Cookie "ingat saya" berlaku 1 tahun (dalam menit).
-            'remember' => 525600,
+            // Centang "Ingat saya" membuat sesi bertahan 30 hari (PRD bagian 2), dalam menit.
+            'remember' => 43200,
         ],
     ],
 
@@ -64,7 +66,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         // 'users' => [
@@ -98,6 +100,14 @@ return [
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
+        ],
+
+        // Email "Buat password" saat akun dibuat: link berlaku 7 hari (PRD bagian 2).
+        'buat' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60 * 24 * 7,
+            'throttle' => 0,
         ],
     ],
 

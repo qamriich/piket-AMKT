@@ -1,5 +1,5 @@
-{{-- Toast dan modal konfirmasi. Dipakai semua layout. --}}
-<div aria-live="polite" class="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4 sm:top-5">
+{{-- Toast dan modal konfirmasi. Dipakai semua layout. Butuh x-data karena berada di luar komponen Livewire. --}}
+<div x-data aria-live="polite" class="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4 sm:top-5">
     <template x-for="t in $store.toast.daftar" :key="t.id">
         <div role="status"
              x-transition:enter="transition duration-300 ease-out" x-transition:enter-start="-translate-y-3 opacity-0" x-transition:enter-end="translate-y-0 opacity-100"
@@ -19,7 +19,7 @@
     </template>
 </div>
 
-<div x-cloak x-show="$store.konfirmasi.buka" class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+<div x-data x-cloak x-show="$store.konfirmasi.buka" class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
      @keydown.escape.window="$store.konfirmasi.batal()" role="dialog" aria-modal="true" aria-labelledby="judul-konfirmasi">
     <div x-show="$store.konfirmasi.buka" x-transition.opacity class="absolute inset-0 bg-navy-tua/60 backdrop-blur-sm" @click="$store.konfirmasi.batal()"></div>
     <div x-show="$store.konfirmasi.buka"

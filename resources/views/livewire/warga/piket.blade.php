@@ -2,9 +2,10 @@
     use App\Enums\JenisPenugasan;
     use App\Enums\StatusPenugasan;
 @endphp
-<div class="halaman flex flex-col gap-3.5 px-4 pb-8 pt-5">
+<div class="halaman flex flex-col gap-3.5 px-4 pb-8 pt-5 lg:px-0 lg:pt-8">
     <h1 class="m-0 text-[26px] font-extrabold text-tinta">Piket saya</h1>
 
+    <div class="grid gap-3.5 lg:grid-cols-2 lg:items-start">
     @forelse ($piket as $i => $p)
         @php
             $tanggal = $p->tanggalLokal();
@@ -111,7 +112,7 @@
             @endif
         </article>
     @empty
-        <div class="kartu flex flex-col items-center gap-3 px-6 py-10 text-center">
+        <div class="kartu flex flex-col items-center gap-3 px-6 py-10 text-center lg:col-span-2">
             <span class="letup flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">
                 <x-ikon nama="kilau" :ukuran="30" />
             </span>
@@ -120,6 +121,7 @@
             <a href="{{ route('warga.jadwal') }}" wire:navigate class="tombol-garis mt-1 no-underline">Lihat jadwal semua orang</a>
         </div>
     @endforelse
+    </div>
 
     <h2 class="mb-0 mt-2 text-lg font-extrabold text-tinta">Pengajuan saya</h2>
     @forelse ($pengajuan as $a)

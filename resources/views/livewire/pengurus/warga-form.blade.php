@@ -19,7 +19,7 @@
                 <input id="email" type="email" wire:model="email" required class="isian-gelap" autocomplete="off">
                 @error('email') <p class="galat-gelap">{{ $message }}</p> @enderror
                 @unless ($baru)
-                    <p class="mt-1.5 text-[13px] text-rock-muda">Kalau email diganti, kirim ulang link supaya link baru terkirim ke email yang benar.</p>
+                    <p class="mt-1.5 text-[13px] text-rock-muda">Email ini dipakai untuk login. Kalau diganti, kirim ulang email buat password dari halaman Warga & geng supaya warga tahu.</p>
                 @endunless
             </div>
 
@@ -61,10 +61,10 @@
 
             @if ($baru)
                 <label class="flex cursor-pointer items-start gap-3 rounded-2xl bg-white/[.05] p-3.5">
-                    <input type="checkbox" wire:model="kirim_link" class="mt-1 h-5 w-5 flex-none accent-[#84B3CE]">
+                    <input type="checkbox" wire:model="kirim_email" class="mt-1 h-5 w-5 flex-none accent-[#84B3CE]">
                     <span>
-                        <span class="font-bold">Kirim link pribadi sekarang</span>
-                        <span class="block text-sm text-rock-muda">Link untuk masuk dikirim ke email di atas.</span>
+                        <span class="font-bold">Kirim email "Buat password" sekarang</span>
+                        <span class="block text-sm text-rock-muda">Warga membuat password sendiri lewat link di email (berlaku 7 hari), lalu bisa login.</span>
                     </span>
                 </label>
             @endif

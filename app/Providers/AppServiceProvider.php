@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Http\Middleware\EnsurePengurus;
-use App\Http\Middleware\RequirePin;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
@@ -24,10 +23,9 @@ class AppServiceProvider extends ServiceProvider
 
         Model::preventLazyLoading(! $this->app->isProduction());
 
-        // Aksi Livewire (tanpa reload) dari halaman pengurus tetap dicek role dan PIN-nya.
+        // Aksi Livewire (tanpa reload) dari halaman pengurus tetap dicek role-nya.
         Livewire::addPersistentMiddleware([
             EnsurePengurus::class,
-            RequirePin::class,
         ]);
     }
 }

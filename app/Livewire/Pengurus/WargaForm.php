@@ -8,7 +8,7 @@ use App\Livewire\Concerns\KhususPengurus;
 use App\Models\Geng;
 use App\Models\LogAktivitas;
 use App\Models\User;
-use App\Services\LinkPribadi;
+use App\Services\AkunPassword;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -37,7 +37,7 @@ class WargaForm extends Component
 
     public bool $wajib_diperiksa = false;
 
-    public bool $kirim_link = true;
+    public bool $kirim_email = true;
 
     public function mount(?User $warga = null): void
     {
@@ -57,7 +57,7 @@ class WargaForm extends Component
         return $this->wargaId ? User::query()->findOrFail($this->wargaId) : null;
     }
 
-    public function simpan(LinkPribadi $linkPribadi)
+    public function simpan(AkunPassword $akun)
     {
         $warga = $this->warga();
 
@@ -86,10 +86,10 @@ class WargaForm extends Component
             LogAktivitas::catat('warga.dibuat', $baru, $data);
 
             $pesan = "Akun {$baru->nama} berhasil dibuat.";
-            if ($this->kirim_link) {
-                $linkPribadi->kirim($baru);
-                LogAktivitas::catat('warga.link_dikirim', $baru);
-                $pesan .= " Link pribadi sedang dikirim ke {$baru->email}.";
+            if ($this->kirim_email) {
+                $akun->kirimBuatPassword($baru);
+                LogAktivitas::catat('warga.email_buat_password', $baru);
+                $pesan .= " Email buat password sedang dikirim ke {$baru->email}.";
             }
 
             session()->flash('status', $pesan);

@@ -3,14 +3,18 @@
 namespace Database\Factories;
 
 use App\Enums\Role;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
+    protected static ?string $password = null;
+
     public function definition(): array
     {
         return [
@@ -21,6 +25,8 @@ class UserFactory extends Factory
             'role' => Role::Warga,
             'wajib_diperiksa' => false,
             'aktif' => true,
+            'email_verified_at' => now(),
+            'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
     }
@@ -40,8 +46,9 @@ class UserFactory extends Factory
         return $this->state(fn () => ['aktif' => false]);
     }
 
-    public function denganPin(string $pin = '123456'): static
+    /** Akun baru yang belum membuat password (belum bisa login). */
+    public function tanpaPassword(): static
     {
-        return $this->afterCreating(fn ($user) => $user->setPin($pin));
+        return $this->state(fn () => ['password' => null, 'email_verified_at' => null]);
     }
 }

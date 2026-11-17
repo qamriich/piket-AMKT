@@ -196,7 +196,7 @@
                                 </span>
                             @endunless
                         </div>
-                        <div class="grid gap-2 sm:grid-cols-2">
+                        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
                             @foreach ($semuaTugas as $t)
                                 @php $on = in_array($t->id, $s['aktif_ids'], true); @endphp
                                 <div wire:key="tg-{{ $tab }}-{{ $t->id }}-{{ $on ? 1 : 0 }}" x-data="{ on: @js($on) }"

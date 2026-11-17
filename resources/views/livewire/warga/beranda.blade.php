@@ -1,20 +1,26 @@
-<div class="halaman flex flex-col">
-    <section class="latar-hero flex flex-col gap-4 px-[18px] pb-6 pt-[26px] text-white sm:rounded-b-[28px]">
-        <span class="kaca naik inline-flex items-center gap-2 self-start rounded-full px-3 py-[7px] text-[13px] font-semibold text-merino">
-            <span class="denyut h-2 w-2 rounded-full bg-green-400"></span>
-            {{ $sekarang->translatedFormat('l, j M') }} · {{ $geng?->nama ?? 'Geng' }} piket harian
-        </span>
+<div class="halaman flex flex-col lg:gap-2 lg:pt-6">
+    <section class="latar-hero grid gap-4 px-[18px] pb-6 pt-[26px] text-white sm:rounded-b-[28px] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-10 lg:rounded-[28px] lg:p-10">
+        {{-- Kiri: sapaan --}}
+        <div class="flex flex-col gap-4 lg:gap-5">
+            <span class="kaca naik inline-flex items-center gap-2 self-start rounded-full px-3 py-[7px] text-[13px] font-semibold text-merino lg:px-3.5 lg:py-2 lg:text-sm">
+                <span class="denyut h-2 w-2 rounded-full bg-green-400"></span>
+                {{ $sekarang->translatedFormat('l, j M') }} · {{ $geng?->nama ?? 'Geng' }} piket harian
+            </span>
 
-        <h1 class="naik t1 m-0 text-[34px] font-extrabold leading-[1.1] tracking-[-0.02em]">
-            Halo, <span class="text-rock">{{ $user->namaDepan() }}</span>
-        </h1>
-        <p class="naik t1 m-0 text-base leading-relaxed text-krem">{{ $subjudul }}</p>
+            <h1 class="naik t1 m-0 text-[34px] font-extrabold leading-[1.1] tracking-[-0.02em] lg:text-[46px] lg:leading-[1.08]">
+                Halo, <span class="text-rock">{{ $user->namaDepan() }}</span>
+            </h1>
+            <p class="naik t1 m-0 text-base leading-relaxed text-krem lg:max-w-[440px] lg:text-[17px]">{{ $subjudul }}</p>
 
-        <div class="grid grid-cols-2 gap-2.5">
+            <a href="{{ route('warga.piket') }}" wire:navigate class="tombol-merino naik t4 hidden self-start no-underline lg:inline-flex">Lihat piket saya →</a>
+        </div>
+
+        {{-- Kanan: kartu bento --}}
+        <div class="grid grid-cols-2 gap-2.5 lg:gap-3.5">
             @if ($tenggat)
                 <a href="{{ route('warga.piket') }}" wire:navigate
                    x-data="hitungMundur(@js($tenggat->tenggatLokal()->toIso8601String()), @js($tenggat->mulai()->toIso8601String()))"
-                   class="kaca angkat naik t2 col-span-2 flex flex-col gap-3 rounded-[20px] p-4 text-left text-white no-underline">
+                   class="kaca angkat naik t2 col-span-2 flex flex-col gap-3 rounded-[20px] p-4 text-left text-white no-underline lg:rounded-[22px] lg:p-5">
                     <span class="flex w-full items-center justify-between gap-3">
                         <span class="flex min-w-0 flex-col gap-0.5">
                             <span class="text-[13px] text-rock-muda">Tenggat terdekat · {{ $tenggat->tenggatLokal()->translatedFormat('l H.i') }}</span>
@@ -30,7 +36,7 @@
                     </span>
                 </a>
             @else
-                <div class="kaca naik t2 col-span-2 flex items-center gap-3 rounded-[20px] p-4">
+                <div class="kaca naik t2 col-span-2 flex items-center gap-3 rounded-[20px] p-4 lg:rounded-[22px] lg:p-5">
                     <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-green-400/20 text-green-300">
                         <x-ikon nama="centang" :ukuran="20" :tebal="2.5" />
                     </span>
@@ -41,26 +47,26 @@
                 </div>
             @endif
 
-            <div class="kaca angkat naik t3 flex flex-col gap-1.5 rounded-[20px] p-4">
-                <span x-data x-hitung data-nilai="{{ $selesaiBulanIni }}" class="text-[32px] font-extrabold leading-none">{{ $selesaiBulanIni }}</span>
-                <span class="text-[13px] font-semibold leading-snug text-krem">Piket selesai bulan ini</span>
+            <div class="kaca angkat naik t3 flex flex-col gap-1.5 rounded-[20px] p-4 lg:rounded-[22px] lg:p-5">
+                <span x-data x-hitung data-nilai="{{ $selesaiBulanIni }}" class="text-[32px] font-extrabold leading-none lg:text-[40px]">{{ $selesaiBulanIni }}</span>
+                <span class="text-[13px] font-semibold leading-snug text-krem lg:text-sm">Piket selesai bulan ini</span>
             </div>
-            <div class="kaca angkat naik t3 flex flex-col gap-1.5 rounded-[20px] p-4">
-                <span x-data x-hitung data-nilai="{{ $bintang }}" @class(['text-[32px] font-extrabold leading-none', 'text-red-300' => $bintang > 0, 'text-white' => $bintang === 0])>{{ $bintang }}</span>
-                <span class="text-[13px] font-semibold leading-snug text-krem">Bintang belum lunas</span>
+            <div class="kaca angkat naik t3 flex flex-col gap-1.5 rounded-[20px] p-4 lg:rounded-[22px] lg:p-5">
+                <span x-data x-hitung data-nilai="{{ $bintang }}" @class(['text-[32px] font-extrabold leading-none lg:text-[40px]', 'text-red-300' => $bintang > 0, 'text-white' => $bintang === 0])>{{ $bintang }}</span>
+                <span class="text-[13px] font-semibold leading-snug text-krem lg:text-sm">Bintang belum lunas</span>
             </div>
         </div>
 
-        <a href="{{ route('warga.piket') }}" wire:navigate class="tombol-merino naik t4 no-underline">Lihat piket saya →</a>
+        <a href="{{ route('warga.piket') }}" wire:navigate class="tombol-merino naik t4 no-underline lg:hidden">Lihat piket saya →</a>
     </section>
 
-    <div class="flex flex-col gap-5 px-4 pb-8 pt-5">
+    <div class="flex flex-col gap-5 px-4 pb-8 pt-5 lg:px-0 lg:pt-6">
         <section class="flex flex-col gap-3" aria-labelledby="judul-tahu">
             <h2 id="judul-tahu" class="judul-bagian">Yang perlu kamu tahu hari ini</h2>
-            <div class="flex flex-col gap-2.5">
+            <div class="grid gap-2.5 lg:grid-cols-2 lg:gap-3.5">
                 @foreach ($kartu as $i => $k)
                     <div wire:key="kartu-{{ $i }}-{{ md5($k['kicker'].$k['judul']) }}" x-data x-muncul="{{ $i }}"
-                         class="kartu-info flex min-h-[84px] items-center gap-3.5 rounded-[18px] border border-pasir bg-white py-3.5 pl-4 pr-3.5 shadow-[0_1px_2px_rgba(14,47,68,.04)]">
+                         class="kartu-info flex min-h-[84px] items-center gap-3.5 rounded-[18px] border border-pasir bg-white py-3.5 pl-4 pr-3.5 shadow-[0_1px_2px_rgba(14,47,68,.04)] lg:min-h-[96px] lg:px-5">
                         <span class="flex h-12 w-12 flex-none items-center justify-center rounded-[14px] transition-colors duration-300" style="background: {{ $k['latar'] }}; color: {{ $k['warna'] }}">
                             <x-ikon :nama="$k['ikon']" :ukuran="22" />
                         </span>

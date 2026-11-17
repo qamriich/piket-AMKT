@@ -41,8 +41,8 @@
                                         @if (! $w->aktif)
                                             <span class="badge badge-netral">Nonaktif</span>
                                         @endif
-                                        @if (! $w->token_hash)
-                                            <span class="badge badge-bintang">Link belum dikirim</span>
+                                        @if (! $w->punyaPassword())
+                                            <span class="badge badge-pengajuan-menunggu">Belum buat password</span>
                                         @endif
                                     </div>
                                 </div>
@@ -65,8 +65,8 @@
                                     <a href="{{ route('pengurus.warga.edit', $w) }}" wire:navigate class="tombol-kecil-gelap no-underline"><x-ikon nama="pensil" :ukuran="16" />&nbsp;Ubah</a>
                                     @if ($w->aktif)
                                         <button type="button" class="tombol-kecil-gelap"
-                                                @click="$store.konfirmasi.tanya({ judul: @js(($w->token_hash ? 'Kirim ulang link ke ' : 'Kirim link ke ').$w->nama.'?'), pesan: @js('Link baru dikirim ke '.$w->email.'. Link lama tidak akan berlaku lagi.'), tombol: 'Kirim link', aksi: () => $wire.kirimLink({{ $w->id }}) })">
-                                            <x-ikon nama="surat" :ukuran="16" />&nbsp;{{ $w->token_hash ? 'Kirim ulang link' : 'Kirim link' }}
+                                                @click="$store.konfirmasi.tanya({ judul: @js('Kirim email buat password ke '.$w->nama.'?'), pesan: @js('Email berisi link untuk membuat password (berlaku 7 hari) dikirim ke '.$w->email.'.'.($w->punyaPassword() ? ' Password lamanya tetap berlaku sampai ia membuat yang baru.' : '')), tombol: 'Kirim email', aksi: () => $wire.kirimBuatPassword({{ $w->id }}) })">
+                                            <x-ikon nama="surat" :ukuran="16" />&nbsp;Kirim ulang email buat password
                                         </button>
                                     @endif
                                     @unless ($w->is($saya))

@@ -214,7 +214,7 @@ class RingkasanWarga
             $senin = RotasiGeng::seninDari($this->sekarang());
 
             $semua = $m
-                ? $m->penugasan()->terbit()->with(['user', 'tugas'])->get()
+                ? $m->penugasan()->terbit()->with(['user.geng', 'tugas'])->get()
                 : collect();
 
             $harian = $semua->where('jenis', JenisPenugasan::Harian)->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());

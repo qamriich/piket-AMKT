@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\JenisTugas;
+use App\Enums\Role;
 use App\Livewire\Pengurus\Pengaturan as HalamanPengaturan;
 use App\Livewire\Pengurus\TugasIndex;
 use App\Models\Pengaturan;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\RotasiGeng;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -123,8 +125,30 @@ class MasterTugasDanPengaturanTest extends TestCase
         foreach ([1, 2, 3] as $u) {
             $this->assertSame(5, $this->geng($u)->anggota()->count());
         }
-        foreach (['Nivia', 'Dilla', 'Gita', 'Dewi'] as $nama) {
-            $this->assertSame($this->geng(2)->id, User::query()->where('nama', 'like', "{$nama}%")->value('geng_id'));
-        }
+
+        // Data asli PRD bagian 13.
+        $wilda = User::query()->where('email', 'wilda@amkt.test')->firstOrFail();
+        $this->assertSame('Wilda', $wilda->nama);
+        $this->assertSame(Role::TataTertib, $wilda->role);
+        $this->assertSame($this->geng(3)->id, $wilda->geng_id);
+        $this->assertNull($wilda->no_kamar);
+        $this->assertSame(Role::Ketua, User::query()->where('nama', 'Gita')->value('role'));
+        $this->assertSame(6, User::query()->where('wajib_diperiksa', true)->count());
+        $this->assertEqualsCanonicalizing(
+            ['Gita', 'Qamri', 'Adel', 'Wilda', 'Ping', 'Ain', 'Pipi', 'Fika', 'Nivia', 'Niya', 'Eca', 'Dilla', 'Dewi', 'Kia', 'Septi'],
+            User::query()->pluck('nama')->all(),
+        );
+
+        // Di luar lokal (termasuk test) password sementara tidak dibuat.
+        $this->assertSame(0, User::query()->whereNotNull('password')->count());
+    }
+
+    public function test_seeder_lokal_memberi_password_sementara(): void
+    {
+        $this->app['env'] = 'local';
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertSame(15, User::query()->whereNotNull('password')->count());
+        $this->assertTrue(Hash::check('piket123', User::query()->where('nama', 'Ping')->value('password')));
     }
 }
