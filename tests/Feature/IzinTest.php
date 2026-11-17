@@ -19,6 +19,7 @@ use App\Services\JadwalHarianPeriode;
 use App\Services\JadwalMinggu;
 use App\Services\LayananIzin;
 use App\Services\PenugasanOtomatis;
+use App\Services\Tenggat;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -53,7 +54,7 @@ class IzinTest extends TestCase
         return app(LayananIzin::class)->buatLangsung($user, $this->t($mulai), $this->t($selesai), 'Kegiatan kampus', $this->masukSebagaiPengurus());
     }
 
-    public function test_izin_menutupi_seluruh_waktu_kamis_piket_diganti_otomatis(): void
+    public function test_contoh_prd_kamis_0800_sampai_jumat_2000_piket_kamis_diganti(): void
     {
         $m = $this->mingguTerbit(aktif: ['kamis' => ['WC 1', 'WC 2']]);
         $nivia = $this->warga('Nivia', 2);
@@ -67,8 +68,8 @@ class IzinTest extends TestCase
         // Gita baru saja mengerjakan WC 1, Dewi belum pernah: Dewi yang dipilih (B3 langkah 2).
         $this->piket($this->mingguTerbit('2026-11-09'), $gita, JenisPenugasan::Kamis, tugas: 'WC 1', status: StatusPenugasan::Selesai);
 
-        // Jendela Kamis: Kamis 00.00 sampai Jumat 18.00 (R3a). Izin Rabu 20.00 – Jumat 20.00 menutupi seluruhnya.
-        $hasil = $this->izinDisetujui($nivia, '2026-11-18 20:00', '2026-11-20 20:00')['hasil'];
+        // Contoh PRD R3a: izin Kamis 08.00 – Jumat 20.00 menutupi waktu Kamis 09.00 – Jumat 18.00.
+        $hasil = $this->izinDisetujui($nivia, '2026-11-19 08:00', '2026-11-20 20:00')['hasil'];
 
         $this->assertSame(StatusPenugasan::Izin, $wc1->fresh()->status);
         $pengganti = $m->penugasan()->bukanIzin()->where('tugas_id', $this->tugas('WC 1')->id)->sole();
@@ -116,6 +117,31 @@ class IzinTest extends TestCase
 
         $this->assertSame(StatusPenugasan::Izin, $harian->fresh()->status);
         $this->assertSame(StatusPenugasan::Terjadwal, $minggu->fresh()->status);
+    }
+
+    public function test_waktu_kamis_dan_minggu_mulai_jam_09(): void
+    {
+        $this->assertSame(['2026-11-19 09:00', '2026-11-20 18:00'], array_map(
+            fn ($t) => $t->format('Y-m-d H:i'), Tenggat::jendela(JenisPenugasan::Kamis, $this->t('2026-11-19'))));
+        $this->assertSame(['2026-11-22 09:00', '2026-11-23 18:00'], array_map(
+            fn ($t) => $t->format('Y-m-d H:i'), Tenggat::jendela(JenisPenugasan::Minggu, $this->t('2026-11-22'))));
+
+        $m = $this->mingguTerbit(aktif: ['kamis' => ['WC 1', 'WC 2'], 'minggu' => ['WC 1']]);
+        $a = $this->warga('A', 2);
+        $b = $this->warga('B', 2);
+        $this->warga('Calon', 3);
+        $tepat = $this->piket($m, $a, JenisPenugasan::Kamis, tugas: 'WC 1');
+        $telat = $this->piket($m, $b, JenisPenugasan::Kamis, tugas: 'WC 2');
+        $minggu = $this->piket($m, $a, JenisPenugasan::Minggu, tugas: 'WC 1');
+
+        // Mulai tepat 09.00 masih menutupi; mulai 09.01 tidak (ada satu menit untuk mengerjakan).
+        $this->izinDisetujui($a, '2026-11-19 09:00', '2026-11-20 18:00');
+        $this->izinDisetujui($b, '2026-11-19 09:01', '2026-11-20 20:00');
+        $this->izinDisetujui($a, '2026-11-22 08:30', '2026-11-23 18:00');
+
+        $this->assertSame(StatusPenugasan::Izin, $tepat->fresh()->status);
+        $this->assertSame(StatusPenugasan::Terjadwal, $telat->fresh()->status);
+        $this->assertSame(StatusPenugasan::Izin, $minggu->fresh()->status);
     }
 
     public function test_warga_mengajukan_izin_dengan_jam_dan_tombol_cepat(): void

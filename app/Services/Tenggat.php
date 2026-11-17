@@ -24,16 +24,17 @@ class Tenggat
         };
     }
 
+    /** Mulai waktu pengerjaan (R3a): harian jam 04.00, Kamis/Minggu/kerja bakti jam 09.00 di hari itu. */
     public static function mulai(JenisPenugasan $jenis, CarbonImmutable $tanggal): CarbonImmutable
     {
         return $jenis === JenisPenugasan::Harian
             ? $tanggal->startOfDay()->setTime(4, 0)
-            : $tanggal->startOfDay();
+            : $tanggal->startOfDay()->setTime(9, 0);
     }
 
     /**
-     * Seluruh waktu pengerjaan (R3a): harian 04.00–09.00 di hari itu, Kamis dari Kamis 00.00 sampai Jumat 18.00,
-     * Minggu dan kerja bakti dari Minggu 00.00 sampai Senin 18.00. Piket hanya terkena izin kalau izinnya
+     * Seluruh waktu pengerjaan (R3a): harian 04.00–09.00 di hari itu, Kamis dari Kamis 09.00 sampai Jumat 18.00,
+     * Minggu dan kerja bakti dari Minggu 09.00 sampai Senin 18.00. Piket hanya terkena izin kalau izinnya
      * menutupi seluruh rentang ini.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}

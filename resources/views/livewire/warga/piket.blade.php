@@ -155,7 +155,7 @@
                 <span wire:loading.remove wire:target="ajukanIzin">Kirim ke pengurus</span>
                 <span wire:loading wire:target="ajukanIzin">Mengirim…</span>
             </button>
-            <span class="text-center text-[13px] leading-snug text-abu">Piket hanya diganti kalau izinmu menutupi seluruh waktu piketnya (harian 04.00–09.00, Kamis sampai Jumat 18.00, Minggu sampai Senin 18.00). Kalau izinnya cuma sebentar, piketnya tetap kamu kerjakan.</span>
+            <span class="text-center text-[13px] leading-snug text-abu">Piket hanya diganti kalau izinmu menutupi seluruh waktu piketnya (harian 04.00–09.00, Kamis 09.00 sampai Jumat 18.00, Minggu 09.00 sampai Senin 18.00). Kalau izinnya cuma sebentar, piketnya tetap kamu kerjakan.</span>
         </form>
 
         @foreach ($izin as $iz)

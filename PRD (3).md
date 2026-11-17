@@ -376,7 +376,7 @@ Bagian ini menggantikan aturan lama di bagian 3, 4, dan 5 kalau bertentangan.
 **R3a. Kapan piket dianggap terkena izin**
 
 - Izin bisa sebentar (beberapa jam atau satu hari, misalnya kegiatan kelompok) atau lama (pulang kampung). Contoh: izin Kamis 19 Nov jam 08.00 sampai Jumat 20 Nov jam 20.00.
-- Piket **diganti** hanya kalau izin menutupi **seluruh** waktu pengerjaannya: harian jam 04.00–09.00 di hari itu, Kamis dari Kamis 00.00 sampai Jumat 18.00, Minggu dari Minggu 00.00 sampai Senin 18.00. Pada contoh di atas, piket Kamis orang itu diganti.
+- Piket **diganti** hanya kalau izin menutupi **seluruh** waktu pengerjaannya: harian jam 04.00–09.00 di hari itu, Kamis dari Kamis 09.00 sampai Jumat 18.00, Minggu dari Minggu 09.00 sampai Senin 18.00. Pada contoh di atas (mulai Kamis 08.00, sebelum 09.00, dan selesai Jumat 20.00, setelah 18.00), piket Kamis orang itu diganti.
 - Kalau izin hanya menutupi sebagian waktu (misalnya pergi Kamis jam 10.00–14.00), piketnya tetap miliknya, karena masih ada waktu untuk mengerjakannya. Pengurus tetap bisa mengganti petugas secara manual.
 - Di form izin, mulai dan selesai diisi dengan pemilih tanggal dan jam. Ada tombol cepat "Hari ini sampai besok" dan "Sehari penuh".
 
