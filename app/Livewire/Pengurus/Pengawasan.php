@@ -16,8 +16,8 @@ use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
 use App\Models\Tugas;
 use App\Models\User;
-use App\Services\IzinPulang;
 use App\Services\JadwalMinggu;
+use App\Services\LayananIzin;
 use App\Services\PelaksanaanPiket;
 use App\Services\PenugasanOtomatis;
 use App\Services\RotasiGeng;
@@ -142,7 +142,7 @@ class Pengawasan extends Component
         }
     }
 
-    public function render(JadwalMinggu $jadwal, PelaksanaanPiket $pelaksanaan, IzinPulang $izin)
+    public function render(JadwalMinggu $jadwal, PelaksanaanPiket $pelaksanaan, LayananIzin $izin)
     {
         $sekarang = CarbonImmutable::now();
         $hariIni = $sekarang->startOfDay();
@@ -211,7 +211,7 @@ class Pengawasan extends Component
                 default => null,
             },
             'statusKoreksi' => PelaksanaanPiket::STATUS_KOREKSI,
-            'sedangPulang' => $izin->sedangPulang($senin, $senin->addDays(6)),
+            'sedangIzin' => $izin->sedangIzin($senin, $senin->addDays(7)),
         ]);
     }
 

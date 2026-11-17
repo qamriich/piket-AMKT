@@ -5,26 +5,26 @@ namespace App\Livewire\Pengurus;
 use App\Enums\StatusIzin;
 use App\Enums\StatusPengajuan;
 use App\Livewire\Concerns\BeriUmpanBalik;
+use App\Livewire\Concerns\FormIzin;
 use App\Livewire\Concerns\KhususPengurus;
 use App\Livewire\Concerns\PutuskanPengajuan;
 use App\Models\Izin;
 use App\Models\PengajuanGantiBintang;
 use App\Models\User;
-use App\Services\IzinPulang;
-use Carbon\CarbonImmutable;
+use App\Services\LayananIzin;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Pengajuan ganti bintang harian (F8) dan izin pulang (R3).
+ * Pengajuan ganti bintang harian (F8) dan izin (R3, R3a).
  */
 #[Layout('components.layouts.pengurus')]
 #[Title('Pengajuan')]
 class Pengajuan extends Component
 {
-    use BeriUmpanBalik, KhususPengurus, PutuskanPengajuan;
+    use BeriUmpanBalik, FormIzin, KhususPengurus, PutuskanPengajuan;
 
     #[Url(except: 'menunggu')]
     public string $tampil = 'menunggu'; // menunggu | riwayat | izin
@@ -32,18 +32,12 @@ class Pengajuan extends Component
     // Form "Buat izin" oleh pengurus (langsung disetujui).
     public string $izin_user = '';
 
-    public string $izin_mulai = '';
-
-    public string $izin_selesai = '';
-
-    public string $izin_alasan = '';
-
     public function setTampil(string $tampil): void
     {
         $this->tampil = in_array($tampil, ['menunggu', 'riwayat', 'izin'], true) ? $tampil : 'menunggu';
     }
 
-    public function setujuiIzin(int $id, ?string $catatan, IzinPulang $layanan): void
+    public function setujuiIzin(int $id, ?string $catatan, LayananIzin $layanan): void
     {
         $izin = Izin::query()->with('user')->find($id);
         if (! $izin) {
@@ -60,7 +54,7 @@ class Pengajuan extends Component
         }
     }
 
-    public function tolakIzin(int $id, ?string $catatan, IzinPulang $layanan): void
+    public function tolakIzin(int $id, ?string $catatan, LayananIzin $layanan): void
     {
         $izin = Izin::query()->with('user')->find($id);
         if (! $izin) {
@@ -72,35 +66,29 @@ class Pengajuan extends Component
         $this->coba(fn () => $layanan->tolak($izin, auth()->user(), $catatan), "Izin {$izin->user->namaDepan()} ditolak.");
     }
 
-    public function buatIzin(IzinPulang $layanan): void
+    public function buatIzin(LayananIzin $layanan): void
     {
-        $this->validate([
-            'izin_user' => ['required', 'integer', 'exists:users,id'],
-            'izin_mulai' => ['required', 'date_format:Y-m-d'],
-            'izin_selesai' => ['required', 'date_format:Y-m-d'],
-            'izin_alasan' => ['nullable', 'string', 'max:500'],
-        ], [
-            'izin_user.required' => 'Pilih warganya.',
-            'izin_mulai.required' => 'Isi tanggal berangkat.',
-            'izin_selesai.required' => 'Isi tanggal kembali.',
-        ]);
+        $this->validate(
+            ['izin_user' => ['required', 'integer', 'exists:users,id']] + $this->aturanFormIzin(),
+            ['izin_user.required' => 'Pilih warganya.'] + $this->pesanFormIzin(),
+        );
 
         $warga = User::query()->findOrFail((int) $this->izin_user);
-        $tz = config('app.timezone');
         $hasil = null;
 
-        $ok = $this->coba(function () use ($layanan, $warga, $tz, &$hasil) {
+        $ok = $this->coba(function () use ($layanan, $warga, &$hasil) {
             $hasil = $layanan->buatLangsung(
                 $warga,
-                CarbonImmutable::createFromFormat('!Y-m-d', $this->izin_mulai, $tz),
-                CarbonImmutable::createFromFormat('!Y-m-d', $this->izin_selesai, $tz),
+                $this->waktuIzin($this->izin_mulai),
+                $this->waktuIzin($this->izin_selesai),
                 $this->izin_alasan,
                 auth()->user(),
             )['hasil'];
         });
 
         if ($ok) {
-            $this->reset('izin_user', 'izin_mulai', 'izin_selesai', 'izin_alasan');
+            $this->reset('izin_user');
+            $this->resetFormIzin();
             $this->toast($this->pesanIzin($warga, $hasil));
         }
     }
@@ -135,14 +123,13 @@ class Pengajuan extends Component
             'daftar' => $daftar,
             'jumlahMenunggu' => PengajuanGantiBintang::query()->where('status', StatusPengajuan::Menunggu->value)->count(),
             'izinMenunggu' => $this->tampil === 'izin'
-                ? Izin::query()->where('status', StatusIzin::Menunggu->value)->with('user.geng')->orderBy('tanggal_mulai')->get()
+                ? Izin::query()->where('status', StatusIzin::Menunggu->value)->with('user.geng')->orderBy('mulai')->get()
                 : collect(),
             'izinRiwayat' => $this->tampil === 'izin'
-                ? Izin::query()->where('status', '!=', StatusIzin::Menunggu->value)->with(['user.geng', 'diputuskanOleh'])->latest('tanggal_mulai')->limit(30)->get()
+                ? Izin::query()->where('status', '!=', StatusIzin::Menunggu->value)->with(['user.geng', 'diputuskanOleh'])->latest('mulai')->limit(30)->get()
                 : collect(),
             'jumlahIzin' => Izin::query()->where('status', StatusIzin::Menunggu->value)->count(),
             'warga' => $this->tampil === 'izin' ? User::query()->aktif()->orderBy('nama')->get(['id', 'nama']) : collect(),
-            'hariIni' => CarbonImmutable::now()->toDateString(),
         ]);
     }
 }

@@ -74,7 +74,7 @@ class Rekap extends Component
 
         $baris = Penugasan::query()
             ->terbit()
-            ->bukanIzin() // piket yang dilepas karena izin pulang tidak dihitung (R3)
+            ->bukanIzin() // piket yang dilepas karena izin tidak dihitung (R3)
             ->whereDate('tanggal', '>=', $awal->toDateString())
             ->whereDate('tanggal', '<=', $akhir->toDateString())
             ->when($jenis, fn ($q) => $q->whereIn('jenis', $jenis))

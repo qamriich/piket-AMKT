@@ -11,20 +11,22 @@ use App\Models\LogAktivitas;
 use App\Models\Penugasan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * PRD bagian 15 R3: izin pulang.
+ * PRD bagian 15 R3 dan R3a: izin (nama fitur di web cukup "Izin"), dengan tanggal + jam.
  *
  * - Warga mengajukan, pengurus menyetujui atau menolak. Pengurus juga bisa langsung membuat izin (langsung disetujui).
- * - Selama izin disetujui, warga tidak masuk pool Kamis/Minggu (lihat JadwalMinggu::pool) dan bintang lamanya ditunda.
- * - Piket terbit di rentang izin yang belum lewat tenggat menjadi Izin (tidak menjadi bintang).
+ * - R3a: piket hanya terkena izin kalau izin menutupi SELURUH waktu pengerjaannya (Tenggat::jendela).
+ *   Izin sebagian tidak mengubah apa pun: piketnya tetap miliknya, dan ia tetap masuk pool.
+ * - Piket terbit yang tertutup izin menjadi Izin (tidak menjadi bintang).
  *   Kamis/Minggu: sistem memilih pengganti (B3 langkah 2). Kalau tidak ada calon, tugasnya "Belum ada petugas".
- *   Harian: harinya kosong; pengurus bisa memilih pengganti secara manual.
+ *   Harian dan kerja bakti: tidak ada pengganti otomatis; hari harian menjadi kosong.
  * - Piket yang masih draf langsung dipindah ke pengganti (atau dikosongkan) tanpa status Izin dan tanpa email.
  */
-class IzinPulang
+class LayananIzin
 {
     /** Rentang izin terpanjang, supaya salah ketik tahun tidak melepas piket berbulan-bulan. */
     public const MAKS_HARI = 62;
@@ -40,8 +42,8 @@ class IzinPulang
 
         $izin = Izin::create([
             'user_id' => $user->id,
-            'tanggal_mulai' => $mulai->toDateString(),
-            'tanggal_selesai' => $selesai->toDateString(),
+            'mulai' => $mulai,
+            'selesai' => $selesai,
             'alasan' => $this->rapikan($alasan),
             'status' => StatusIzin::Menunggu,
             'dibuat_oleh_id' => $user->id,
@@ -65,8 +67,8 @@ class IzinPulang
         [$izin, $hasil] = DB::transaction(function () use ($warga, $mulai, $selesai, $alasan, $oleh) {
             $izin = Izin::create([
                 'user_id' => $warga->id,
-                'tanggal_mulai' => $mulai->toDateString(),
-                'tanggal_selesai' => $selesai->toDateString(),
+                'mulai' => $mulai,
+                'selesai' => $selesai,
                 'alasan' => $this->rapikan($alasan),
                 'status' => StatusIzin::Disetujui,
                 'dibuat_oleh_id' => $oleh->id,
@@ -120,8 +122,25 @@ class IzinPulang
         $this->pemberitahuan->izinDiputuskan($izin);
     }
 
+    /** Piket milik warga ini yang seluruh waktu pengerjaannya tertutup izin (R3a). */
+    public function piketTertutup(Izin $izin): Collection
+    {
+        // Piket Kamis/Minggu bisa berakhir sehari setelah tanggalnya, jadi rentang tanggal diperlebar sehari ke belakang.
+        return Penugasan::query()
+            ->where('user_id', $izin->user_id)
+            ->whereIn('status', [StatusPenugasan::Terjadwal->value, StatusPenugasan::BayarBintang->value])
+            ->whereDate('tanggal', '>=', $izin->mulaiLokal()->subDay()->toDateString())
+            ->whereDate('tanggal', '<=', $izin->selesaiLokal()->toDateString())
+            ->where('tenggat', '>', CarbonImmutable::now()->format('Y-m-d H:i:s'))
+            ->with(['mingguPiket', 'tugas'])
+            ->orderBy('tanggal')
+            ->get()
+            ->filter(fn (Penugasan $p) => $izin->menutupi(...Tenggat::jendela($p->jenis, $p->tanggalLokal())))
+            ->values();
+    }
+
     /**
-     * Melepas piket warga di rentang izin dan memilih pengganti.
+     * Melepas piket yang tertutup izin dan memilih pengganti.
      *
      * @return array{dilepas: list<string>, pengganti: list<string>, tanpa_petugas: list<string>}
      */
@@ -130,17 +149,7 @@ class IzinPulang
         $hasil = ['dilepas' => [], 'pengganti' => [], 'tanpa_petugas' => []];
         $izin->loadMissing('user');
 
-        $piket = Penugasan::query()
-            ->where('user_id', $izin->user_id)
-            ->whereIn('status', [StatusPenugasan::Terjadwal->value, StatusPenugasan::BayarBintang->value])
-            ->whereDate('tanggal', '>=', $izin->tanggal_mulai->toDateString())
-            ->whereDate('tanggal', '<=', $izin->tanggal_selesai->toDateString())
-            ->where('tenggat', '>', CarbonImmutable::now()->format('Y-m-d H:i:s'))
-            ->with(['mingguPiket', 'tugas'])
-            ->orderBy('tanggal')
-            ->get();
-
-        foreach ($piket as $p) {
+        foreach ($this->piketTertutup($izin) as $p) {
             $minggu = $p->mingguPiket;
             $terbit = $minggu->sudahTerbit($p->jenis);
             $sesi = match ($p->jenis) {
@@ -195,7 +204,7 @@ class IzinPulang
             $hasil['pengganti'][] = $p->namaTugas().': '.$pengganti->namaDepan();
 
             $this->pemberitahuan->berubah($pengganti, 'Kamu jadi pengganti: '.$p->namaTugas(), [
-                "{$izin->user->namaDepan()} sedang izin pulang, jadi sistem memilihmu sebagai pengganti.",
+                "{$izin->user->namaDepan()} sedang izin, jadi sistem memilihmu sebagai pengganti.",
                 '• '.$baru->ringkasan(),
             ]);
         }
@@ -203,22 +212,22 @@ class IzinPulang
         return $hasil;
     }
 
-    /** Warga yang sedang pulang dalam rentang tersebut (untuk panel Pengawasan). */
-    public function sedangPulang(CarbonImmutable $mulai, CarbonImmutable $selesai)
+    /** Warga yang izinnya (disetujui) bersinggungan dengan rentang tersebut, untuk panel Pengawasan. */
+    public function sedangIzin(CarbonImmutable $dari, CarbonImmutable $sampai): Collection
     {
-        return Izin::query()->disetujui()->bersinggungan($mulai, $selesai)
-            ->with('user.geng')->orderBy('tanggal_mulai')->get();
+        return Izin::query()->disetujui()->bersinggungan($dari, $sampai)
+            ->with('user.geng')->orderBy('mulai')->get();
     }
 
     private function periksaRentang(User $user, CarbonImmutable $mulai, CarbonImmutable $selesai, bool $bolehLampau): void
     {
-        if ($selesai->lt($mulai)) {
-            throw ValidationException::withMessages(['izin' => 'Tanggal pulang kembali harus sama dengan atau setelah tanggal berangkat.']);
+        if ($selesai->lessThanOrEqualTo($mulai)) {
+            throw ValidationException::withMessages(['izin' => 'Waktu selesai harus setelah waktu mulai.']);
         }
-        if (! $bolehLampau && $selesai->lt(CarbonImmutable::today())) {
-            throw ValidationException::withMessages(['izin' => 'Tanggal izin sudah lewat.']);
+        if (! $bolehLampau && $selesai->lessThanOrEqualTo(CarbonImmutable::now())) {
+            throw ValidationException::withMessages(['izin' => 'Waktu izin sudah lewat.']);
         }
-        if ($mulai->diffInDays($selesai) + 1 > self::MAKS_HARI) {
+        if ($mulai->diffInDays($selesai) > self::MAKS_HARI) {
             throw ValidationException::withMessages(['izin' => 'Izin paling lama '.self::MAKS_HARI.' hari.']);
         }
         if (! $user->aktif) {
@@ -230,7 +239,7 @@ class IzinPulang
             ->bersinggungan($mulai, $selesai)
             ->exists();
         if ($bentrok) {
-            throw ValidationException::withMessages(['izin' => 'Sudah ada izin di tanggal itu.']);
+            throw ValidationException::withMessages(['izin' => 'Sudah ada izin di waktu itu.']);
         }
     }
 

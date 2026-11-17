@@ -150,14 +150,14 @@ class JadwalHarianPeriode
                     continue;
                 }
 
-                // R3: warga yang izin pulang hari itu tercatat Izin, dan harinya menjadi kosong.
+                // R3/R3a: kalau izinnya menutupi jam 04.00–09.00, tercatat Izin dan harinya menjadi kosong.
                 Penugasan::create([
                     'minggu_piket_id' => $minggu->id,
                     'user_id' => $user->id,
                     'jenis' => JenisPenugasan::Harian,
                     'tanggal' => $tanggal->toDateString(),
                     'tenggat' => Tenggat::untuk(JenisPenugasan::Harian, $tanggal),
-                    'status' => $user->sedangIzinPada($tanggal) ? StatusPenugasan::Izin : StatusPenugasan::Terjadwal,
+                    'status' => $user->izinUntuk(JenisPenugasan::Harian, $tanggal) ? StatusPenugasan::Izin : StatusPenugasan::Terjadwal,
                 ]);
                 $dibuat++;
             }

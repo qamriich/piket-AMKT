@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-/** Status izin pulang (PRD bagian 15 R3). */
+/** Status izin (PRD bagian 15 R3). */
 enum StatusIzin: string
 {
     case Menunggu = 'menunggu';

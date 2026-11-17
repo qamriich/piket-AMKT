@@ -364,14 +364,28 @@ Bagian ini menggantikan aturan lama di bagian 3, 4, dan 5 kalau bertentangan.
 - Ada menu Ganti password di Profil dan "Lupa password" di halaman login (lewat email).
 - Pengurus bisa menekan "Reset password" di Warga & geng, yang mengembalikan akun ke password awal baru dan mengaktifkan lagi `harus_ganti_password`.
 
-**R3. Izin pulang**
+**R3. Izin (revisi 17 Nov malam: pakai jam; nama fitur di web cukup "Izin")**
 
-- Tabel baru `izin`: id, user_id, tanggal_mulai, tanggal_selesai, alasan (opsional), status (menunggu / disetujui / ditolak), dibuat_oleh_id, diputuskan_oleh_id.
+- Tabel baru `izin`: id, user_id, mulai (tanggal + jam), selesai (tanggal + jam), alasan (opsional, misalnya pulang kampung, kegiatan kampus, KKN), status (menunggu / disetujui / ditolak), dibuat_oleh_id, diputuskan_oleh_id.
 - Pengurus bisa langsung membuat izin (langsung disetujui). Warga bisa mengajukan izin dari halaman Piket saya, lalu pengurus menyetujui atau menolak, dan warga mendapat email.
 - Selama izin disetujui, warga tidak masuk pool pembagian Kamis dan Minggu yang tanggal piketnya jatuh di rentang izin. Bintang lama miliknya juga ditunda.
 - Kalau warga sudah dapat piket yang sudah terbit lalu izinnya disetujui, piket itu berstatus **Izin** (abu-abu, tidak menjadi bintang). Sistem otomatis memilih **pengganti** dengan aturan yang sama seperti B3 langkah 2: warga di pool yang sedang di asrama, belum punya tugas reguler di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Pengganti mendapat email. Kalau tidak ada calon, tugas ditandai "Belum ada petugas" untuk diisi pengurus.
 - Untuk piket harian, hari milik warga yang izin menjadi kosong. Pengurus bisa memilih pengganti secara manual.
 - Panel Pengawasan menampilkan daftar siapa yang sedang pulang minggu ini.
+
+**R3a. Kapan piket dianggap terkena izin**
+
+- Izin bisa sebentar (beberapa jam atau satu hari, misalnya kegiatan kelompok) atau lama (pulang kampung). Contoh: izin Kamis 19 Nov jam 08.00 sampai Jumat 20 Nov jam 20.00.
+- Piket **diganti** hanya kalau izin menutupi **seluruh** waktu pengerjaannya: harian jam 04.00–09.00 di hari itu, Kamis dari Kamis 00.00 sampai Jumat 18.00, Minggu dari Minggu 00.00 sampai Senin 18.00. Pada contoh di atas, piket Kamis orang itu diganti.
+- Kalau izin hanya menutupi sebagian waktu (misalnya pergi Kamis jam 10.00–14.00), piketnya tetap miliknya, karena masih ada waktu untuk mengerjakannya. Pengurus tetap bisa mengganti petugas secara manual.
+- Di form izin, mulai dan selesai diisi dengan pemilih tanggal dan jam. Ada tombol cepat "Hari ini sampai besok" dan "Sehari penuh".
+
+**R6. Pengajuan ganti bintang harian harus terlihat jelas**
+
+- Di halaman Utang (warga), setiap bintang harian yang belum lunas tampil sebagai kartu dengan tombol **"Ajukan ganti"**. Bukan hanya baris riwayat.
+- Tombol itu membuka form: daftar hari kosong yang masih tersedia (minggu mana pun ke depan), pilih satu, lalu kirim. Setelah dikirim, kartu menampilkan status Menunggu, Diterima, atau Ditolak.
+- Bintang Kamis dan Minggu tidak punya tombol ajukan, karena dijadwalkan ulang otomatis. Kartunya menampilkan keterangan "Akan dijadwalkan ulang di Kamis/Minggu berikutnya".
+- Riwayat bintang yang sudah lunas tetap ditampilkan di bagian bawah halaman yang sama.
 
 **R4. Label status**
 

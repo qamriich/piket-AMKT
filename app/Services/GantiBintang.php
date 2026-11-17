@@ -9,6 +9,7 @@ use App\Models\LogAktivitas;
 use App\Models\MingguPiket;
 use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
+use App\Models\PeriodeHarian;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -23,43 +24,66 @@ class GantiBintang
 {
     public function __construct(private JadwalMinggu $jadwal, private Pemberitahuan $pemberitahuan) {}
 
+    /** Berapa minggu ke depan hari kosong dicari (R6: "minggu mana pun ke depan"). */
+    public const MINGGU_KE_DEPAN = 8;
+
     /**
-     * Tanggal kosong (F8): mulai besok, di minggu yang jadwal hariannya sudah ada, tanpa petugas harian
-     * (hari yang kosong karena izin juga dihitung kosong), dan belum diajukan atau diterima untuk orang lain.
+     * Tanggal kosong (F8, R6): mulai besok sampai 8 minggu ke depan, hari tanpa petugas harian, dan belum
+     * diajukan orang lain. Hari yang kosong karena izin juga dihitung kosong.
+     *
+     * - Minggu yang jadwal hariannya sudah dibuat: dilihat dari penugasan yang ada.
+     * - Minggu depan yang belum dibuat: dihitung dari jadwal harian periode (R1) dan rotasi geng (B1).
+     *   Hari di luar periode mana pun tidak ditampilkan, karena jadwal hariannya belum ada.
      *
      * @return Collection<int, CarbonImmutable>
      */
-    public function tanggalKosong(int $batas = 8, ?int $kecualiPengajuan = null): Collection
+    public function tanggalKosong(int $batas = PHP_INT_MAX, ?int $kecualiPengajuan = null): Collection
     {
         $besok = CarbonImmutable::now()->addDay()->startOfDay();
+        $seninAwal = RotasiGeng::seninDari($besok);
+        $akhir = $seninAwal->addWeeks(self::MINGGU_KE_DEPAN)->subDay();
 
-        $minggu = MingguPiket::query()
-            ->where('status_harian', 'terbit')
-            ->whereDate('tanggal_senin', '>=', RotasiGeng::seninDari($besok)->toDateString())
-            ->orderBy('tanggal_senin')
-            ->get();
-
-        if ($minggu->isEmpty()) {
-            return collect();
-        }
+        $mingguAda = MingguPiket::query()
+            ->whereDate('tanggal_senin', '>=', $seninAwal->toDateString())
+            ->whereDate('tanggal_senin', '<=', $akhir->toDateString())
+            ->get()
+            ->keyBy(fn (MingguPiket $m) => $m->tanggal_senin->toDateString());
 
         $terisi = Penugasan::query()->bukanIzin()->where('jenis', JenisPenugasan::Harian->value)
             ->whereDate('tanggal', '>=', $besok->toDateString())
-            ->pluck('tanggal')->map(fn ($t) => $t->toDateString())->all();
+            ->whereDate('tanggal', '<=', $akhir->toDateString())
+            ->pluck('tanggal')->map(fn ($t) => $t->toDateString())->flip();
 
         $diajukan = PengajuanGantiBintang::query()
             ->where('status', StatusPengajuan::Menunggu->value)
             ->when($kecualiPengajuan, fn ($q) => $q->whereKeyNot($kecualiPengajuan))
             ->whereDate('tanggal_diajukan', '>=', $besok->toDateString())
-            ->pluck('tanggal_diajukan')->map(fn ($t) => $t->toDateString())->all();
+            ->pluck('tanggal_diajukan')->map(fn ($t) => $t->toDateString())->flip();
 
+        $rotasi = RotasiGeng::dariPengaturan();
+        $periode = PeriodeHarian::query()
+            ->whereDate('tanggal_mulai', '<=', $akhir->toDateString())
+            ->whereDate('tanggal_selesai', '>=', $besok->toDateString())
+            ->with('hari.user')
+            ->get();
         $hasil = collect();
-        foreach ($minggu as $m) {
+
+        for ($w = 0; $w < self::MINGGU_KE_DEPAN; $w++) {
+            $senin = $seninAwal->addWeeks($w);
+            $m = $mingguAda->get($senin->toDateString());
+            $sudahDibuat = $m && $m->sudahTerbit('harian');
+            $gengId = $m?->geng_harian_id ?? $rotasi->gengHarian($senin)?->id;
+
             for ($i = 0; $i < 7; $i++) {
-                $t = $m->senin()->addDays($i);
-                if ($t->lt($besok) || in_array($t->toDateString(), $terisi, true) || in_array($t->toDateString(), $diajukan, true)) {
+                $t = $senin->addDays($i);
+                $kunci = $t->toDateString();
+                if ($t->lt($besok) || $terisi->has($kunci) || $diajukan->has($kunci)) {
                     continue;
                 }
+                if (! $sudahDibuat && ! $this->kosongMenurutPeriode($periode, $t, $gengId)) {
+                    continue;
+                }
+
                 $hasil->push($t);
                 if ($hasil->count() >= $batas) {
                     return $hasil;
@@ -70,9 +94,23 @@ class GantiBintang
         return $hasil;
     }
 
+    /** Hari di minggu yang belum dibuat: kosong kalau ada periode tetapi tidak ada anggota geng yang bertugas di hari itu. */
+    private function kosongMenurutPeriode(Collection $semuaPeriode, CarbonImmutable $tanggal, ?int $gengId): bool
+    {
+        $periode = $semuaPeriode->first(fn (PeriodeHarian $p) => $p->mencakup($tanggal));
+        if (! $periode || ! $gengId) {
+            return false;
+        }
+
+        $user = $periode->hari->first(fn ($b) => $b->geng_id === $gengId && $b->hari === $tanggal->dayOfWeekIso)?->user;
+
+        // Sama seperti JadwalHarianPeriode::terapkan: anggota yang pindah geng, nonaktif, atau izin tidak mengisi harinya.
+        return ! $user || ! $user->aktif || $user->geng_id !== $gengId || $user->izinUntuk(JenisPenugasan::Harian, $tanggal);
+    }
+
     public function tanggalMasihKosong(CarbonImmutable $tanggal, ?int $kecualiPengajuan = null): bool
     {
-        return $this->tanggalKosong(PHP_INT_MAX, $kecualiPengajuan)
+        return $this->tanggalKosong(kecualiPengajuan: $kecualiPengajuan)
             ->contains(fn (CarbonImmutable $t) => $t->isSameDay($tanggal));
     }
 

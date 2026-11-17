@@ -137,8 +137,9 @@ class RingkasanWarga
     {
         return PengajuanGantiBintang::query()
             ->where('user_id', $user->id)
-            ->with('penugasanBintang')
+            ->with(['penugasanBintang', 'diputuskanOleh'])
             ->latest()
+            ->orderByDesc('id')
             ->get();
     }
 
@@ -148,15 +149,15 @@ class RingkasanWarga
      *
      * @return Collection<int, CarbonImmutable>
      */
-    public function tanggalKosong(int $batas = 8): Collection
+    public function tanggalKosong(int $batas = PHP_INT_MAX): Collection
     {
         return $this->ingat("kosong.{$batas}", fn () => app(GantiBintang::class)->tanggalKosong($batas));
     }
 
-    /** @return Collection<int, Izin> Izin pulang milik warga, terbaru di atas. */
+    /** @return Collection<int, Izin> Izin milik warga, terbaru di atas. */
     public function izinSaya(User $user): Collection
     {
-        return $user->izin()->with('diputuskanOleh')->latest('tanggal_mulai')->limit(10)->get();
+        return $user->izin()->with('diputuskanOleh')->latest('mulai')->limit(10)->get();
     }
 
     /** Petugas harian yang terbit untuk satu tanggal. */

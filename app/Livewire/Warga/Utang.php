@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Warga;
 
-use App\Enums\StatusPengajuan;
+use App\Enums\StatusPenugasan;
 use App\Livewire\Concerns\BeriUmpanBalik;
 use App\Models\Penugasan;
 use App\Services\GantiBintang;
 use App\Services\RingkasanWarga;
+use App\Services\RotasiGeng;
 use Carbon\CarbonImmutable;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -34,7 +35,9 @@ class Utang extends Component
             return;
         }
 
-        $this->coba(fn () => $ganti->ajukan(auth()->user(), $bintang, $t), 'Pengajuan terkirim. Tunggu jawaban pengurus, ya.');
+        if ($this->coba(fn () => $ganti->ajukan(auth()->user(), $bintang, $t), 'Pengajuan terkirim. Tunggu jawaban pengurus, ya.')) {
+            $this->dispatch('ganti-terkirim', id: $bintang->id);
+        }
         $ringkas->lupakan();
     }
 
@@ -43,10 +46,15 @@ class Utang extends Component
         $user = auth()->user();
         $pengajuan = $ringkas->pengajuanSaya($user);
 
+        $bintang = $ringkas->bintangSaya($user);
+
         return view('livewire.warga.utang', [
-            'bintang' => $ringkas->bintangSaya($user),
-            'menunggu' => $pengajuan->where('status', StatusPengajuan::Menunggu)->keyBy('penugasan_bintang_id'),
-            'tanggalKosong' => $ringkas->tanggalKosong(),
+            // R6: bintang yang belum lunas tampil sebagai kartu di atas, riwayat yang sudah lunas di bawah.
+            'belumLunas' => $bintang->where('status', StatusPenugasan::Bintang)->values(),
+            'lunas' => $bintang->where('status', StatusPenugasan::Lunas)->values(),
+            // Pengajuan terakhir untuk setiap bintang (Menunggu, Diterima, atau Ditolak).
+            'pengajuanTerakhir' => $pengajuan->groupBy('penugasan_bintang_id')->map->first(),
+            'kosongPerMinggu' => $ringkas->tanggalKosong()->groupBy(fn (CarbonImmutable $t) => RotasiGeng::seninDari($t)->toDateString()),
         ]);
     }
 }

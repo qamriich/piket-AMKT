@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\JenisPenugasan;
 use App\Enums\Role;
 use App\Notifications\TautanPassword;
 use Carbon\CarbonImmutable;
@@ -69,15 +70,16 @@ class User extends Authenticatable
         return $this->hasMany(Izin::class);
     }
 
-    /** Warga yang sedang izin pulang (disetujui) pada tanggal tersebut tidak ikut (R3). */
-    public function scopeTidakIzinPada(Builder $query, CarbonImmutable $tanggal): Builder
+    /** Warga yang izinnya (disetujui) menutupi seluruh waktu piket itu tidak ikut (R3, R3a). */
+    public function scopeTidakIzinUntuk(Builder $query, JenisPenugasan $jenis, CarbonImmutable $tanggal): Builder
     {
-        return $query->whereDoesntHave('izin', fn (Builder $q) => $q->disetujui()->mencakup($tanggal));
+        return $query->whereDoesntHave('izin', fn (Builder $q) => $q->disetujui()->menutupiPiket($jenis, $tanggal));
     }
 
-    public function sedangIzinPada(CarbonImmutable $tanggal): bool
+    /** Izin yang disetujui menutupi seluruh waktu piket jenis ini di tanggal itu (R3a). */
+    public function izinUntuk(JenisPenugasan $jenis, CarbonImmutable $tanggal): bool
     {
-        return $this->izin()->disetujui()->mencakup($tanggal)->exists();
+        return $this->izin()->disetujui()->menutupiPiket($jenis, $tanggal)->exists();
     }
 
     public function scopeAktif(Builder $query): Builder

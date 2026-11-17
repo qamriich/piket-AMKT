@@ -136,7 +136,7 @@ class Beranda extends Component
         $petunjuk = match (true) {
             $p->status === StatusPenugasan::Selesai => 'Sudah ditandai selesai. Terima kasih!',
             $p->status === StatusPenugasan::Bintang => 'Lewat batas waktu, jadi bintang.',
-            $p->status === StatusPenugasan::Izin => 'Dilepas karena kamu izin pulang.',
+            $p->status === StatusPenugasan::Izin => 'Dilepas karena kamu sedang izin.',
             $bisaSekarang => 'Batas '.Tenggat::label($p->tenggatLokal(), $sekarang),
             default => 'Dikerjakan '.$tanggal->translatedFormat('l, j M').'.',
         };

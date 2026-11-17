@@ -102,7 +102,7 @@ class JadwalMinggu
 
     /**
      * Pool petugas (B3): Kamis = anggota aktif 2 geng non-harian, Minggu = semua warga aktif.
-     * Warga yang izin pulang (disetujui) pada tanggal piket itu tidak masuk pool (R3).
+     * Warga yang izinnya menutupi seluruh waktu piket sesi itu tidak masuk pool (R3, R3a). Izin sebagian tetap masuk pool.
      *
      * @return Collection<int, User>
      */
@@ -112,7 +112,7 @@ class JadwalMinggu
 
         return User::query()
             ->aktif()
-            ->tidakIzinPada($tanggal)
+            ->tidakIzinUntuk($sesi === SesiTugas::Kamis ? JenisPenugasan::Kamis : JenisPenugasan::Minggu, $tanggal)
             ->when($sesi === SesiTugas::Kamis, fn ($q) => $q
                 ->whereNotNull('geng_id')
                 ->where('geng_id', '!=', $minggu->geng_harian_id))
@@ -296,7 +296,7 @@ class JadwalMinggu
         if ($baris && $baris->status !== StatusPenugasan::Terjadwal) {
             throw ValidationException::withMessages(['harian' => 'Hari ini sudah terisi Bayar Bintang atau sudah dikerjakan.']);
         }
-        // Pengganti boleh warga aktif mana pun (misalnya saat petugasnya izin pulang, R3).
+        // Pengganti boleh warga aktif mana pun (misalnya saat petugasnya izin, R3).
         if ($user && ! $user->aktif) {
             throw ValidationException::withMessages(['harian' => 'Warga ini tidak aktif.']);
         }

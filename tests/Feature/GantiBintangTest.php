@@ -9,9 +9,11 @@ use App\Livewire\Pengurus\Pengajuan;
 use App\Livewire\Warga\Utang;
 use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
+use App\Models\User;
 use App\Notifications\PengajuanBaru;
 use App\Notifications\PengajuanDiputuskan;
 use App\Services\GantiBintang;
+use App\Services\JadwalHarianPeriode;
 use App\Services\PelaksanaanPiket;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,7 +82,7 @@ class GantiBintangTest extends TestCase
         $wilda = $this->masukSebagaiPengurus();
         $this->actingAs($ping);
 
-        $this->get(route('warga.utang'))->assertSee('Ajukan ganti ke pengurus')->assertDontSee('segera tersedia');
+        $this->get(route('warga.utang'))->assertSee('Ajukan ganti')->assertSee('Jumat')->assertDontSee('segera tersedia');
         Livewire::test(Utang::class)->call('ajukan', $bintang->id, '2026-11-20')->assertDispatched('toast', jenis: 'sukses')
             ->assertSee('Pengajuan terkirim');
 
@@ -151,5 +153,55 @@ class GantiBintangTest extends TestCase
         $this->masukSebagaiPengurus();
         Livewire::test(Pengajuan::class)->call('terimaPengajuan', $ajuan->id)->assertDispatched('toast', jenis: 'gagal');
         $this->assertSame(StatusPengajuan::Menunggu, $ajuan->fresh()->status);
+    }
+
+    public function test_r6_hari_kosong_minggu_depan_dihitung_dari_jadwal_periode(): void
+    {
+        [, $ping, $bintang] = $this->siapkan();
+        $septi = $this->warga('Septi', 2);
+        $periode = app(JadwalHarianPeriode::class);
+        $p = $periode->simpanPeriode(null, 'Ganjil', $this->tanggal('2026-11-01'), $this->tanggal('2026-11-30'));
+        // Minggu 23 Nov: rotasi B1 = Geng 2. Hanya Senin yang diisi; hari lain sampai akhir periode kosong.
+        $periode->simpanHari($p, [$this->geng(2)->id => [1 => $septi->id]]);
+
+        $kosong = app(GantiBintang::class)->tanggalKosong()->map->toDateString()->all();
+
+        $this->assertNotContains('2026-11-23', $kosong, 'Senin terisi Septi menurut periode');
+        $this->assertContains('2026-11-24', $kosong);
+        $this->assertContains('2026-11-30', $kosong);
+        $this->assertNotContains('2026-12-01', $kosong, 'Di luar periode: jadwal harian belum ada');
+
+        // Diterima untuk minggu yang barisnya belum dibuat: minggunya dibuat dan tanggal itu terisi Bayar Bintang.
+        $ajuan = app(GantiBintang::class)->ajukan($ping, $bintang, $this->tanggal('2026-11-25'));
+        app(GantiBintang::class)->terima($ajuan, $this->masukSebagaiPengurus());
+        $this->assertSame(StatusPenugasan::BayarBintang, Penugasan::query()->whereDate('tanggal', '2026-11-25')->sole()->status);
+        $this->assertNotContains('2026-11-25', app(GantiBintang::class)->tanggalKosong()->map->toDateString()->all());
+    }
+
+    public function test_r6_kartu_bintang_menampilkan_status_pengajuan(): void
+    {
+        [$m, $ping, $bintang] = $this->siapkan();
+        $kamis = $this->piket($m, $ping, JenisPenugasan::Kamis, '2026-11-12', StatusPenugasan::Bintang, 'WC 1');
+        $lunas = $this->piket($m, $ping, JenisPenugasan::Harian, '2026-11-16', StatusPenugasan::Lunas);
+        $this->actingAs($ping);
+
+        // Bintang Kamis tanpa tombol; bintang harian dengan tombol; yang lunas di riwayat bawah.
+        Livewire::test(Utang::class)
+            ->assertSeeInOrder(['Ajukan ganti', 'Akan dijadwalkan ulang di Kamis berikutnya', 'Riwayat bintang lunas'])
+            ->assertSee('Minggu 16–22 Nov');
+
+        $ajuan = app(GantiBintang::class)->ajukan($ping, $bintang, $this->tanggal('2026-11-20'));
+        Livewire::test(Utang::class)->assertSee('Pengajuan terkirim')->assertSee('Menunggu')->assertDontSee('Ajukan ganti</');
+
+        $pengurus = User::factory()->pengurus()->create();
+        app(GantiBintang::class)->tolak($ajuan, $pengurus, 'Hari itu ada acara');
+        Livewire::test(Utang::class)->assertSee('Pengajuan ditolak')->assertSee('Hari itu ada acara')->assertSee('Ajukan ganti');
+
+        $ajuan2 = app(GantiBintang::class)->ajukan($ping, $bintang->fresh(), $this->tanggal('2026-11-22'));
+        app(GantiBintang::class)->terima($ajuan2, $pengurus);
+        Livewire::test(Utang::class)->assertSee('Pengajuan diterima')->assertSee('Diterima');
+
+        $this->assertNotNull($kamis);
+        $this->assertNotNull($lunas);
     }
 }

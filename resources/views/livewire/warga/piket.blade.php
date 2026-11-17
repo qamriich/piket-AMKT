@@ -94,7 +94,7 @@
             @elseif ($p->status === StatusPenugasan::Izin)
                 <div class="flex items-start gap-3 rounded-[14px] bg-slate-100 px-4 py-3 text-sm leading-normal text-slate-700">
                     <x-ikon nama="rumah" :ukuran="18" class="mt-0.5 flex-none" />
-                    <span>Kamu sedang izin pulang, jadi piket ini dilepas dan tidak menjadi bintang.
+                    <span>Kamu sedang izin, jadi piket ini dilepas dan tidak menjadi bintang.
                         {{ $p->jenis === JenisPenugasan::Harian ? 'Pengurus yang mengatur penggantinya.' : 'Sudah dicarikan pengganti.' }}</span>
                 </div>
             @elseif (! $bisa)
@@ -142,35 +142,20 @@
             <div class="flex min-w-0 items-center gap-3">
                 <span class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-langit text-venice"><x-ikon nama="rumah" :ukuran="22" /></span>
                 <div class="flex min-w-0 flex-col">
-                    <h2 id="judul-izin" class="m-0 text-lg font-extrabold text-tinta">Izin pulang</h2>
-                    <span class="text-sm text-abu-tua">Mau pulang kampung? Ajukan dulu supaya piketmu dicarikan pengganti.</span>
+                    <h2 id="judul-izin" class="m-0 text-lg font-extrabold text-tinta">Izin</h2>
+                    <span class="text-sm text-abu-tua">Mau pergi atau pulang kampung? Ajukan dulu supaya piketmu dicarikan pengganti.</span>
                 </div>
             </div>
             <button type="button" class="tombol-garis flex-none !min-h-[44px] px-4 text-sm" @click="buka = !buka" :aria-expanded="buka" x-text="buka ? 'Tutup' : 'Ajukan'">Ajukan</button>
         </div>
 
         <form x-show="buka" x-collapse x-cloak wire:submit="ajukanIzin" class="flex flex-col gap-3 border-t border-pasir pt-3">
-            <div class="grid grid-cols-2 gap-3">
-                <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
-                    Berangkat
-                    <input type="date" wire:model="izin_mulai" min="{{ $hariIni }}" class="isian" required>
-                    @error('izin_mulai') <span class="text-[13px] font-semibold text-red-700">{{ $message }}</span> @enderror
-                </label>
-                <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
-                    Kembali
-                    <input type="date" wire:model="izin_selesai" min="{{ $hariIni }}" class="isian" required>
-                    @error('izin_selesai') <span class="text-[13px] font-semibold text-red-700">{{ $message }}</span> @enderror
-                </label>
-            </div>
-            <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
-                Alasan (boleh dikosongkan)
-                <input type="text" wire:model="izin_alasan" maxlength="500" class="isian" placeholder="Misalnya: pulang ke Samarinda">
-            </label>
+            @include('livewire._isian-izin', ['gelap' => false, 'min' => $hariIni])
             <button type="submit" class="tombol-utama w-full" wire:loading.attr="disabled" wire:target="ajukanIzin">
                 <span wire:loading.remove wire:target="ajukanIzin">Kirim ke pengurus</span>
                 <span wire:loading wire:target="ajukanIzin">Mengirim…</span>
             </button>
-            <span class="text-center text-[13px] text-abu">Selama izin disetujui, piketmu tidak menjadi bintang.</span>
+            <span class="text-center text-[13px] leading-snug text-abu">Piket hanya diganti kalau izinmu menutupi seluruh waktu piketnya (harian 04.00–09.00, Kamis sampai Jumat 18.00, Minggu sampai Senin 18.00). Kalau izinnya cuma sebentar, piketnya tetap kamu kerjakan.</span>
         </form>
 
         @foreach ($izin as $iz)

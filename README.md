@@ -33,8 +33,9 @@ setelah antrean diproses (`php artisan queue:work`, atau `--stop-when-empty` unt
 **Pelaksanaan (Tahap 3).** Warga menekan "Saya sudah selesai" di Piket saya atau Beranda (kecuali yang wajib
 diperiksa: pengurus yang menandai di Pengawasan). Setelah batas waktu, piket yang belum selesai otomatis jadi
 Bintang (scheduler + pengecekan ringan setiap halaman dibuka); pengurus mengubahnya lewat **Koreksi** dengan
-catatan wajib. Bintang harian diganti lewat pengajuan di menu Utang, izin pulang diajukan dari Piket saya, dan
-keduanya diputuskan di menu Pengajuan. Semua email (jadwal terbit, perubahan, pengingat, bintang, pengajuan, izin)
+catatan wajib. Bintang harian diganti lewat tombol "Ajukan ganti" di menu Utang (hari kosong sampai 8 minggu ke
+depan, dihitung dari jadwal periode), Izin (tanggal + jam) diajukan dari Piket saya, dan keduanya diputuskan di
+menu Pengajuan. Piket hanya diganti kalau izin menutupi seluruh waktu pengerjaannya (R3a). Semua email (jadwal terbit, perubahan, pengingat, bintang, pengajuan, izin)
 lewat antrean.
 
 Tampilan memakai Livewire 3 (tanpa reload), Tailwind CSS 4, dan Alpine.js bawaan Livewire.

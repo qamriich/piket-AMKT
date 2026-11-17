@@ -3,7 +3,7 @@
         <h1 class="m-0 text-[30px] font-extrabold leading-tight sm:text-[36px]">Pengajuan</h1>
         <span class="text-[15px] text-rock-muda">
             Ganti bintang: warga memilih hari kosong untuk mengganti bintang harian, dan pengajuan yang diterima mengisi hari itu dengan status Bayar Bintang.
-            Izin pulang: piket warga yang izin dilepas dan dicarikan pengganti.
+            Izin: piket yang seluruh waktunya tertutup izin dilepas dan dicarikan pengganti.
         </span>
     </div>
 
@@ -13,7 +13,7 @@
         </button>
         <button type="button" role="tab" class="segmen-gelap-tombol" aria-selected="{{ $tampil === 'riwayat' ? 'true' : 'false' }}" wire:click="setTampil('riwayat')">Riwayat</button>
         <button type="button" role="tab" class="segmen-gelap-tombol" aria-selected="{{ $tampil === 'izin' ? 'true' : 'false' }}" wire:click="setTampil('izin')">
-            Izin pulang @if ($jumlahIzin) ({{ $jumlahIzin }}) @endif
+            Izin @if ($jumlahIzin) ({{ $jumlahIzin }}) @endif
         </button>
     </div>
 
@@ -64,7 +64,7 @@
                         <div class="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-langit font-extrabold text-venice">{{ $iz->user->inisial() }}</div>
                         <div class="flex min-w-0 flex-[1_1_220px] flex-col gap-0.5">
                             <span class="text-base font-extrabold">{{ $iz->user->nama }} <span class="text-sm font-semibold text-rock-muda">· {{ $iz->user->geng?->nama }}</span></span>
-                            <span class="text-sm text-krem">Pulang {{ $iz->rentangLabel() }}</span>
+                            <span class="text-sm text-krem">Izin {{ $iz->rentangLabel() }}</span>
                             @if ($iz->alasan)
                                 <span class="text-[13px] text-rock-muda">Alasan: {{ $iz->alasan }}</span>
                             @endif
@@ -76,7 +76,7 @@
                                 <button type="button" class="tombol-kaca"
                                         @click="$store.konfirmasi.tanya({ judul: @js('Tolak izin '.$iz->user->namaDepan().'?'), pesan: 'Piketnya tetap berjalan seperti biasa.', tombol: 'Tolak', bahaya: true, aksi: () => $wire.tolakIzin({{ $iz->id }}, catatan) })">Tolak</button>
                                 <button type="button" class="tombol-rock"
-                                        @click="$store.konfirmasi.tanya({ judul: @js('Setujui izin '.$iz->user->namaDepan().'?'), pesan: 'Piketnya yang sudah terbit di rentang ini menjadi Izin dan sistem memilih pengganti.', tombol: 'Setujui', aksi: () => $wire.setujuiIzin({{ $iz->id }}, catatan) })">Setujui</button>
+                                        @click="$store.konfirmasi.tanya({ judul: @js('Setujui izin '.$iz->user->namaDepan().'?'), pesan: 'Piket terbit yang seluruh waktunya tertutup izin ini menjadi Izin dan sistem memilih pengganti.', tombol: 'Setujui', aksi: () => $wire.setujuiIzin({{ $iz->id }}, catatan) })">Setujui</button>
                             </div>
                             <button type="button" class="self-start text-[13px] font-bold text-rock-muda underline" x-show="!tulis" @click="tulis = true">+ Tambah catatan</button>
                         </div>
@@ -119,22 +119,7 @@
                         </select>
                         @error('izin_user') <span class="text-[13px] text-red-300">{{ $message }}</span> @enderror
                     </label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-krem">
-                            Berangkat
-                            <input type="date" wire:model="izin_mulai" class="isian-gelap" required>
-                            @error('izin_mulai') <span class="text-[13px] text-red-300">{{ $message }}</span> @enderror
-                        </label>
-                        <label class="flex flex-col gap-1.5 text-sm font-semibold text-krem">
-                            Kembali
-                            <input type="date" wire:model="izin_selesai" min="{{ $hariIni }}" class="isian-gelap" required>
-                            @error('izin_selesai') <span class="text-[13px] text-red-300">{{ $message }}</span> @enderror
-                        </label>
-                    </div>
-                    <label class="flex flex-col gap-1.5 text-sm font-semibold text-krem">
-                        Alasan (boleh kosong)
-                        <input type="text" wire:model="izin_alasan" maxlength="500" class="isian-gelap">
-                    </label>
+                    @include('livewire._isian-izin', ['gelap' => true])
                     <button type="submit" class="tombol-merino" wire:loading.attr="disabled" wire:target="buatIzin">
                         <span wire:loading.remove wire:target="buatIzin">Simpan izin</span>
                         <span wire:loading wire:target="buatIzin">Menyimpan…</span>

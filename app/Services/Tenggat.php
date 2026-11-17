@@ -31,6 +31,18 @@ class Tenggat
             : $tanggal->startOfDay();
     }
 
+    /**
+     * Seluruh waktu pengerjaan (R3a): harian 04.00–09.00 di hari itu, Kamis dari Kamis 00.00 sampai Jumat 18.00,
+     * Minggu dan kerja bakti dari Minggu 00.00 sampai Senin 18.00. Piket hanya terkena izin kalau izinnya
+     * menutupi seluruh rentang ini.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function jendela(JenisPenugasan $jenis, CarbonImmutable $tanggal): array
+    {
+        return [self::mulai($jenis, $tanggal), self::untuk($jenis, $tanggal)];
+    }
+
     /** Contoh: "Jumat 18.00" atau "hari ini 09.00". */
     public static function label(CarbonImmutable $waktu, ?CarbonImmutable $sekarang = null): string
     {

@@ -123,7 +123,7 @@ class PenugasanOtomatis
 
             if (! $pool->has($bintang->user_id)) {
                 $alasan = match (true) {
-                    $bintang->user?->sedangIzinPada($tanggal) => 'Pemiliknya sedang izin pulang',
+                    $bintang->user?->izinUntuk($sesi === SesiTugas::Kamis ? JenisPenugasan::Kamis : JenisPenugasan::Minggu, $tanggal) => 'Pemiliknya sedang izin',
                     $sesi === SesiTugas::Kamis => 'Pemiliknya sedang piket harian atau tidak aktif',
                     default => 'Pemiliknya tidak aktif',
                 };
@@ -212,7 +212,7 @@ class PenugasanOtomatis
     }
 
     /**
-     * R3: pengganti untuk satu tugas yang dilepas karena izin pulang, dengan aturan B3 langkah 2:
+     * R3: pengganti untuk satu tugas yang dilepas karena izin, dengan aturan B3 langkah 2:
      * warga di pool yang sedang di asrama (pool sudah tanpa warga yang izin), belum punya tugas reguler
      * di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Seri: paling lama tidak dapat tugas, lalu acak.
      *

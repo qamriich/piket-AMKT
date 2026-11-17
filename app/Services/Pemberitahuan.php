@@ -38,7 +38,9 @@ class Pemberitahuan
         $baris = $minggu->penugasan()->bukanIzin()->whereIn('jenis', $sesi->jenisPenugasan())
             ->with(['tugas', 'membayar'])->get()->groupBy('user_id');
 
-        $izin = Izin::query()->disetujui()->mencakup($tanggal)->pluck('user_id')->all();
+        $izin = Izin::query()->disetujui()
+            ->menutupiPiket($sesi === SesiTugas::Kamis ? JenisPenugasan::Kamis : JenisPenugasan::Minggu, $tanggal)
+            ->pluck('user_id')->all();
         $jumlah = 0;
 
         foreach (User::query()->aktif()->orderBy('id')->get() as $u) {
@@ -56,7 +58,7 @@ class Pemberitahuan
                 $u->notify(new JadwalDiterbitkan("Piket {$nama} kamu: ".$punya->map->namaTugas()->join(', '), $isi, 'Lihat piket saya', 'warga.piket'));
             } else {
                 $alasan = match (true) {
-                    in_array($u->id, $izin, true) => 'karena kamu sedang izin pulang',
+                    in_array($u->id, $izin, true) => 'karena kamu sedang izin',
                     $sesi === SesiTugas::Kamis && $u->geng_id === $minggu->geng_harian_id => 'karena gengmu sedang piket harian minggu ini',
                     default => 'karena tugasnya sudah terbagi habis. Minggu depan kamu didahulukan',
                 };
@@ -248,14 +250,14 @@ class Pemberitahuan
     public function izinDiajukan(Izin $izin): void
     {
         $izin->loadMissing('user');
-        $isi = ["{$izin->user->nama} mengajukan izin pulang {$izin->rentangLabel()}."];
+        $isi = ["{$izin->user->nama} mengajukan izin {$izin->rentangLabel()}."];
         if ($izin->alasan) {
             $isi[] = 'Alasan: '.$izin->alasan;
         }
-        $isi[] = 'Setujui atau tolak lewat menu Pengajuan → Izin pulang.';
+        $isi[] = 'Setujui atau tolak lewat menu Pengajuan → Izin.';
 
         Notification::send(User::query()->aktif()->pengurus()->get(), new IzinDiajukan(
-            "Izin pulang dari {$izin->user->namaDepan()}", $isi, 'Buka pengajuan', 'pengurus.pengajuan',
+            "Izin dari {$izin->user->namaDepan()}", $isi, 'Buka pengajuan', 'pengurus.pengajuan',
         ));
     }
 
@@ -266,8 +268,8 @@ class Pemberitahuan
         $disetujui = $izin->status === StatusIzin::Disetujui;
 
         $isi = [$disetujui
-            ? "Izin pulangmu {$izin->rentangLabel()} disetujui. Selama izin, kamu tidak dijadwalkan piket Kamis dan Minggu."
-            : "Izin pulangmu {$izin->rentangLabel()} ditolak, jadi piketmu tetap berjalan seperti biasa."];
+            ? "Izinmu {$izin->rentangLabel()} disetujui. Piket yang seluruh waktunya tertutup izin ini dilepas; piket lain tetap milikmu."
+            : "Izinmu {$izin->rentangLabel()} ditolak, jadi piketmu tetap berjalan seperti biasa."];
         if ($disetujui && $dilepas !== []) {
             $isi[] = 'Piket yang dilepas (status Izin, tidak menjadi bintang):';
             foreach ($dilepas as $d) {
@@ -278,6 +280,6 @@ class Pemberitahuan
             $isi[] = 'Catatan pengurus: '.$izin->catatan;
         }
 
-        $izin->user->notify(new IzinDiputuskan('Izin pulang '.($disetujui ? 'disetujui' : 'ditolak'), $isi, 'Lihat piket saya', 'warga.piket'));
+        $izin->user->notify(new IzinDiputuskan('Izin '.($disetujui ? 'disetujui' : 'ditolak'), $isi, 'Lihat piket saya', 'warga.piket'));
     }
 }

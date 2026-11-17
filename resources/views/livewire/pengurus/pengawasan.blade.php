@@ -248,13 +248,13 @@
                 @endif
             </section>
 
-            <section class="kartu-kaca naik t4 flex flex-col gap-3 rounded-3xl p-[22px]" aria-labelledby="judul-pulang">
+            <section class="kartu-kaca naik t4 flex flex-col gap-3 rounded-3xl p-[22px]" aria-labelledby="judul-izin">
                 <div class="flex items-center justify-between gap-3">
-                    <h2 id="judul-pulang" class="m-0 text-lg font-extrabold">Sedang pulang minggu ini</h2>
+                    <h2 id="judul-izin" class="m-0 text-lg font-extrabold">Sedang izin minggu ini</h2>
                     <a href="{{ route('pengurus.pengajuan', ['tampil' => 'izin']) }}" wire:navigate class="text-sm font-bold text-merino no-underline">Izin →</a>
                 </div>
-                @forelse ($sedangPulang as $iz)
-                    <div wire:key="pulang-{{ $iz->id }}" class="flex items-center gap-3">
+                @forelse ($sedangIzin as $iz)
+                    <div wire:key="izin-{{ $iz->id }}" class="flex items-center gap-3">
                         <div class="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-white/10 text-sm font-extrabold text-merino">{{ $iz->user->inisial() }}</div>
                         <div class="flex min-w-0 flex-col">
                             <span class="text-[15px] font-extrabold">{{ $iz->user->nama }} <span class="text-sm font-semibold text-rock-muda">· {{ $iz->user->geng?->nama }}</span></span>
@@ -262,7 +262,7 @@
                         </div>
                     </div>
                 @empty
-                    <p class="m-0 text-[15px] leading-normal text-krem">Semua warga ada di asrama minggu ini.</p>
+                    <p class="m-0 text-[15px] leading-normal text-krem">Tidak ada yang izin minggu ini.</p>
                 @endforelse
             </section>
 
