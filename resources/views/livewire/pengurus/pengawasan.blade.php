@@ -157,8 +157,8 @@
 
             <div wire:loading.remove wire:target="setFilter, setRentang, jenis, geng, periksaSekarang" class="flex flex-col gap-4">
                 @if ($harianHariIni)
-                    <div class="letup flex items-center justify-between gap-3 rounded-2xl border border-rock/35 bg-rock/[.14] px-4 py-3.5">
-                        <div class="flex flex-col gap-0.5">
+                    <div class="letup flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rock/35 bg-rock/[.14] px-4 py-3.5">
+                        <div class="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
                             <span class="text-xs font-bold tracking-[0.04em] text-rock-muda">HARIAN · 04.00–09.00</span>
                             <span class="flex flex-wrap items-center gap-2 text-base font-extrabold">
                                 {{ $harianHariIni->user->nama }}
@@ -169,6 +169,10 @@
                         </div>
                         <x-badge :status="$harianHariIni->status"
                                  :label="$harianHariIni->status === StatusPenugasan::Selesai && $harianHariIni->selesai_pada ? 'Selesai '.$harianHariIni->selesai_pada->format('H.i') : null" />
+                        @if ($harianHariIni->catatan)
+                            <span class="w-full text-[13px] text-krem">Catatan: {{ $harianHariIni->catatan }}</span>
+                        @endif
+                        @include('livewire.pengurus._aksi-piket', ['p' => $harianHariIni, 'jenisAksi' => $aksi($harianHariIni)])
                     </div>
                 @endif
 
@@ -192,15 +196,9 @@
                                     <span class="text-[13px] text-krem">Catatan: {{ $p->catatan }}</span>
                                 @endif
                             </div>
-                            <x-badge :status="$p->status" />
-                            @if ($p->status->belumSelesai())
-                                <button type="button" disabled title="Fitur tandai selesai segera tersedia"
-                                        @class(['min-h-[44px] min-w-[140px] rounded-xl px-3 text-sm font-extrabold opacity-60',
-                                            'bg-merino text-navy' => $p->user->wajib_diperiksa,
-                                            'border border-rock/60 bg-rock/15 text-merino' => ! $p->user->wajib_diperiksa])>
-                                    {{ $p->user->wajib_diperiksa ? 'Periksa & selesai' : 'Tandai selesai' }}
-                                </button>
-                            @endif
+                            <x-badge :status="$p->status"
+                                     :label="$p->status === StatusPenugasan::Selesai && $p->selesai_pada ? 'Selesai '.$p->selesai_pada->format('H.i').($p->selesaiOleh && $p->selesai_oleh_id !== $p->user_id ? ' · '.$p->selesaiOleh->namaDepan() : '') : null" />
+                            @include('livewire.pengurus._aksi-piket', ['p' => $p, 'jenisAksi' => $aksi($p)])
                         </div>
                     @empty
                         <div class="flex flex-col items-center gap-2 px-7 py-8 text-center text-[15px] text-rock-muda">
@@ -215,7 +213,8 @@
                 </div>
                 <p class="m-0 flex items-start gap-2 text-[13px] leading-normal text-rock-muda">
                     <x-ikon nama="info" :ukuran="16" class="mt-0.5 flex-none" />
-                    Tombol tandai selesai dan pemeriksaan aktif di tahap berikutnya. Daftar ini hanya berisi jadwal yang sudah terbit.
+                    Daftar ini hanya berisi jadwal yang sudah terbit. Tandai selesai saat piket diperiksa, sebelum batas waktunya.
+                    Setelah batas lewat, ubah status lewat Koreksi dengan catatan.
                 </p>
             </div>
         </section>
@@ -239,10 +238,7 @@
                                 </span>
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button type="button" disabled title="Segera tersedia" class="tombol-kaca">Tolak</button>
-                            <button type="button" disabled title="Segera tersedia" class="tombol-rock">Terima</button>
-                        </div>
+                        @include('livewire.pengurus._putuskan-pengajuan', ['a' => $a])
                     </div>
                 @empty
                     <p class="m-0 text-[15px] leading-normal text-krem">Belum ada pengajuan yang menunggu.</p>
@@ -250,6 +246,24 @@
                 @if ($jumlahPengajuan > 3)
                     <a href="{{ route('pengurus.pengajuan') }}" wire:navigate class="text-sm font-bold text-merino no-underline">Lihat semua pengajuan →</a>
                 @endif
+            </section>
+
+            <section class="kartu-kaca naik t4 flex flex-col gap-3 rounded-3xl p-[22px]" aria-labelledby="judul-pulang">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 id="judul-pulang" class="m-0 text-lg font-extrabold">Sedang pulang minggu ini</h2>
+                    <a href="{{ route('pengurus.pengajuan', ['tampil' => 'izin']) }}" wire:navigate class="text-sm font-bold text-merino no-underline">Izin →</a>
+                </div>
+                @forelse ($sedangPulang as $iz)
+                    <div wire:key="pulang-{{ $iz->id }}" class="flex items-center gap-3">
+                        <div class="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-white/10 text-sm font-extrabold text-merino">{{ $iz->user->inisial() }}</div>
+                        <div class="flex min-w-0 flex-col">
+                            <span class="text-[15px] font-extrabold">{{ $iz->user->nama }} <span class="text-sm font-semibold text-rock-muda">· {{ $iz->user->geng?->nama }}</span></span>
+                            <span class="text-sm text-krem">{{ $iz->rentangLabel() }}@if ($iz->alasan) · {{ $iz->alasan }} @endif</span>
+                        </div>
+                    </div>
+                @empty
+                    <p class="m-0 text-[15px] leading-normal text-krem">Semua warga ada di asrama minggu ini.</p>
+                @endforelse
             </section>
 
             <section class="kartu-kaca naik t5 flex flex-col gap-3.5 rounded-3xl p-[22px]">

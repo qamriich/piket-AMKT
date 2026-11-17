@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Role;
 use App\Notifications\TautanPassword;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -61,6 +62,22 @@ class User extends Authenticatable
     public function pengajuanGantiBintang(): HasMany
     {
         return $this->hasMany(PengajuanGantiBintang::class);
+    }
+
+    public function izin(): HasMany
+    {
+        return $this->hasMany(Izin::class);
+    }
+
+    /** Warga yang sedang izin pulang (disetujui) pada tanggal tersebut tidak ikut (R3). */
+    public function scopeTidakIzinPada(Builder $query, CarbonImmutable $tanggal): Builder
+    {
+        return $query->whereDoesntHave('izin', fn (Builder $q) => $q->disetujui()->mencakup($tanggal));
+    }
+
+    public function sedangIzinPada(CarbonImmutable $tanggal): bool
+    {
+        return $this->izin()->disetujui()->mencakup($tanggal)->exists();
     }
 
     public function scopeAktif(Builder $query): Builder

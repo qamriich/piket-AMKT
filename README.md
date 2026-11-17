@@ -12,6 +12,7 @@ cp .env.example .env && php artisan key:generate   # kalau .env belum ada
 php artisan migrate:fresh --seed                   # 15 warga asli (PRD bagian 13)
 php artisan serve
 php artisan queue:work                             # di terminal lain, supaya email terkirim ke log
+php artisan schedule:work                          # di terminal lain: bintang otomatis + pengingat tiap 15 menit
 ```
 
 Buka `http://localhost:8000` lalu login dengan email `<nama>@amkt.test`, misalnya `wilda@amkt.test`
@@ -29,6 +30,13 @@ hanya piket Kamis dan Minggu.
 Email lokal tidak benar-benar dikirim (`MAIL_MAILER=log`). Isinya bisa dibaca di `storage/logs/laravel.log`
 setelah antrean diproses (`php artisan queue:work`, atau `--stop-when-empty` untuk sekali jalan).
 
+**Pelaksanaan (Tahap 3).** Warga menekan "Saya sudah selesai" di Piket saya atau Beranda (kecuali yang wajib
+diperiksa: pengurus yang menandai di Pengawasan). Setelah batas waktu, piket yang belum selesai otomatis jadi
+Bintang (scheduler + pengecekan ringan setiap halaman dibuka); pengurus mengubahnya lewat **Koreksi** dengan
+catatan wajib. Bintang harian diganti lewat pengajuan di menu Utang, izin pulang diajukan dari Piket saya, dan
+keduanya diputuskan di menu Pengajuan. Semua email (jadwal terbit, perubahan, pengingat, bintang, pengajuan, izin)
+lewat antrean.
+
 Tampilan memakai Livewire 3 (tanpa reload), Tailwind CSS 4, dan Alpine.js bawaan Livewire.
 HP memakai 5 tab ikon; laptop (≥ 1024 px) memakai navbar lebar dan dashboard 2 kolom (PRD bagian 14).
 Setelah mengubah tampilan, jalankan `npm run build` (atau `npm run dev` selama mengembangkan).
@@ -44,6 +52,7 @@ Setelah mengubah tampilan, jalankan `npm run build` (atau `npm run dev` selama m
 | Perintah | Fungsi |
 | --- | --- |
 | `php artisan app:create-admin` | Membuat akun Tata Tertib pertama dengan password awal (`--password=`, kalau kosong dibuat acak) |
+| `php artisan piket:jalankan` | Bintang otomatis (B4), email piket harian minggu ini, dan pengingat. Dijadwalkan tiap 15 menit |
 
 ## Test
 

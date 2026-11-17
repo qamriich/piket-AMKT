@@ -80,8 +80,15 @@
                                 @endforeach
                             </div>
                         @endif
-                        <button type="button" disabled class="tombol-utama w-full">Ajukan ganti ke pengurus</button>
-                        <span class="text-center text-[13px] text-abu">Pengajuan lewat aplikasi segera tersedia. Sementara itu, sampaikan pilihan harimu ke Tata Tertib.</span>
+                        @if ($tanggalKosong->isNotEmpty())
+                            <button type="button" class="tombol-utama w-full" :disabled="!pilih"
+                                    @click="pilih && $wire.ajukan({{ $b->id }}, pilih)"
+                                    wire:loading.attr="disabled" wire:target="ajukan">
+                                <span wire:loading.remove wire:target="ajukan">Ajukan ganti ke pengurus</span>
+                                <span wire:loading wire:target="ajukan">Mengirim…</span>
+                            </button>
+                            <span class="text-center text-[13px] text-abu" x-text="pilih ? 'Pengurus akan menerima atau menolak, lalu kamu dapat email.' : 'Pilih salah satu hari dulu.'">Pilih salah satu hari dulu.</span>
+                        @endif
                     </div>
                 @endif
             </article>

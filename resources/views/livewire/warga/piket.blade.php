@@ -91,6 +91,12 @@
                         Pengurus akan menjadwalkan ulang di minggu berikutnya.
                     @endif
                 </div>
+            @elseif ($p->status === StatusPenugasan::Izin)
+                <div class="flex items-start gap-3 rounded-[14px] bg-slate-100 px-4 py-3 text-sm leading-normal text-slate-700">
+                    <x-ikon nama="rumah" :ukuran="18" class="mt-0.5 flex-none" />
+                    <span>Kamu sedang izin pulang, jadi piket ini dilepas dan tidak menjadi bintang.
+                        {{ $p->jenis === JenisPenugasan::Harian ? 'Pengurus yang mengatur penggantinya.' : 'Sudah dicarikan pengganti.' }}</span>
+                </div>
             @elseif (! $bisa)
                 <p class="m-0 flex items-center gap-2 text-sm text-abu-tua">
                     <x-ikon nama="jam" :ukuran="18" class="flex-none text-venice" />
@@ -101,13 +107,21 @@
                     <x-ikon nama="perisai" :ukuran="20" class="mt-0.5 flex-none" />
                     <span>Setelah selesai, panggil pengurus untuk memeriksa. Pengurus yang akan menandai piketmu selesai.</span>
                 </div>
-            @else
+            @elseif (in_array($p->id, $bisaSendiri, true))
                 <div class="flex flex-col gap-1.5">
-                    <button type="button" disabled class="tombol-utama w-full min-h-14 text-[17px]">
-                        <x-ikon nama="centang" :ukuran="22" :tebal="2.5" />
-                        Saya sudah selesai
+                    <button type="button" class="tombol-utama w-full min-h-14 text-[17px]"
+                            wire:click="selesai({{ $p->id }})" wire:loading.attr="disabled" wire:target="selesai({{ $p->id }})">
+                        <span wire:loading.remove wire:target="selesai({{ $p->id }})" class="inline-flex items-center gap-2">
+                            <x-ikon nama="centang" :ukuran="22" :tebal="2.5" />
+                            Saya sudah selesai
+                        </span>
+                        <span wire:loading wire:target="selesai({{ $p->id }})">Menyimpan…</span>
                     </button>
-                    <span class="text-center text-[13px] text-abu">Tombol ini segera aktif. Sementara itu, lapor ke pengurus setelah selesai.</span>
+                    <span class="text-center text-[13px] text-abu">Tekan setelah semua tugasnya beres, sebelum {{ $p->tenggatLokal()->translatedFormat('l') }} jam {{ $p->tenggatLokal()->format('H.i') }}.</span>
+                </div>
+            @else
+                <div class="rounded-[14px] bg-red-50 px-4 py-3 text-sm leading-normal text-red-900">
+                    Batas waktunya sudah lewat. Kalau sebenarnya sudah kamu kerjakan, sampaikan ke pengurus.
                 </div>
             @endif
         </article>
@@ -122,6 +136,55 @@
         </div>
     @endforelse
     </div>
+
+    <section x-data="{ buka: false }" x-on:izin-terkirim.window="buka = false" class="kartu mt-2 flex flex-col gap-3 p-[18px]" aria-labelledby="judul-izin">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex min-w-0 items-center gap-3">
+                <span class="flex h-11 w-11 flex-none items-center justify-center rounded-[14px] bg-langit text-venice"><x-ikon nama="rumah" :ukuran="22" /></span>
+                <div class="flex min-w-0 flex-col">
+                    <h2 id="judul-izin" class="m-0 text-lg font-extrabold text-tinta">Izin pulang</h2>
+                    <span class="text-sm text-abu-tua">Mau pulang kampung? Ajukan dulu supaya piketmu dicarikan pengganti.</span>
+                </div>
+            </div>
+            <button type="button" class="tombol-garis flex-none !min-h-[44px] px-4 text-sm" @click="buka = !buka" :aria-expanded="buka" x-text="buka ? 'Tutup' : 'Ajukan'">Ajukan</button>
+        </div>
+
+        <form x-show="buka" x-collapse x-cloak wire:submit="ajukanIzin" class="flex flex-col gap-3 border-t border-pasir pt-3">
+            <div class="grid grid-cols-2 gap-3">
+                <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
+                    Berangkat
+                    <input type="date" wire:model="izin_mulai" min="{{ $hariIni }}" class="isian" required>
+                    @error('izin_mulai') <span class="text-[13px] font-semibold text-red-700">{{ $message }}</span> @enderror
+                </label>
+                <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
+                    Kembali
+                    <input type="date" wire:model="izin_selesai" min="{{ $hariIni }}" class="isian" required>
+                    @error('izin_selesai') <span class="text-[13px] font-semibold text-red-700">{{ $message }}</span> @enderror
+                </label>
+            </div>
+            <label class="flex flex-col gap-1.5 text-sm font-bold text-tinta">
+                Alasan (boleh dikosongkan)
+                <input type="text" wire:model="izin_alasan" maxlength="500" class="isian" placeholder="Misalnya: pulang ke Samarinda">
+            </label>
+            <button type="submit" class="tombol-utama w-full" wire:loading.attr="disabled" wire:target="ajukanIzin">
+                <span wire:loading.remove wire:target="ajukanIzin">Kirim ke pengurus</span>
+                <span wire:loading wire:target="ajukanIzin">Mengirim…</span>
+            </button>
+            <span class="text-center text-[13px] text-abu">Selama izin disetujui, piketmu tidak menjadi bintang.</span>
+        </form>
+
+        @foreach ($izin as $iz)
+            <div wire:key="izin-{{ $iz->id }}" class="flex items-center justify-between gap-3 rounded-xl bg-merino/60 px-3.5 py-3">
+                <div class="flex min-w-0 flex-col gap-0.5">
+                    <span class="text-[15px] font-extrabold text-tinta">{{ $iz->rentangLabel() }}</span>
+                    @if ($iz->alasan || $iz->catatan)
+                        <span class="text-sm text-abu-tua">{{ $iz->alasan }}@if ($iz->alasan && $iz->catatan) · @endif @if ($iz->catatan) Catatan pengurus: {{ $iz->catatan }} @endif</span>
+                    @endif
+                </div>
+                <x-badge :status="$iz->status" class="flex-none" />
+            </div>
+        @endforeach
+    </section>
 
     <h2 class="mb-0 mt-2 text-lg font-extrabold text-tinta">Pengajuan saya</h2>
     @forelse ($pengajuan as $a)

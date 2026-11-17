@@ -150,13 +150,14 @@ class JadwalHarianPeriode
                     continue;
                 }
 
+                // R3: warga yang izin pulang hari itu tercatat Izin, dan harinya menjadi kosong.
                 Penugasan::create([
                     'minggu_piket_id' => $minggu->id,
                     'user_id' => $user->id,
                     'jenis' => JenisPenugasan::Harian,
                     'tanggal' => $tanggal->toDateString(),
                     'tenggat' => Tenggat::untuk(JenisPenugasan::Harian, $tanggal),
-                    'status' => StatusPenugasan::Terjadwal,
+                    'status' => $user->sedangIzinPada($tanggal) ? StatusPenugasan::Izin : StatusPenugasan::Terjadwal,
                 ]);
                 $dibuat++;
             }
@@ -185,7 +186,7 @@ class JadwalHarianPeriode
             DB::transaction(function () use ($m) {
                 $m->penugasan()
                     ->where('jenis', JenisPenugasan::Harian->value)
-                    ->where('status', StatusPenugasan::Terjadwal->value)
+                    ->whereIn('status', [StatusPenugasan::Terjadwal->value, StatusPenugasan::Izin->value])
                     ->delete();
                 $m->update(['status_harian' => StatusTerbit::Draf]);
             });

@@ -10,12 +10,15 @@ use App\Enums\StatusPengajuan;
 use App\Enums\StatusPenugasan;
 use App\Livewire\Concerns\BeriUmpanBalik;
 use App\Livewire\Concerns\KhususPengurus;
+use App\Livewire\Concerns\PutuskanPengajuan;
 use App\Models\Geng;
 use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
 use App\Models\Tugas;
 use App\Models\User;
+use App\Services\IzinPulang;
 use App\Services\JadwalMinggu;
+use App\Services\PelaksanaanPiket;
 use App\Services\PenugasanOtomatis;
 use App\Services\RotasiGeng;
 use Carbon\CarbonImmutable;
@@ -32,7 +35,7 @@ use Livewire\Component;
 #[Title('Pengawasan')]
 class Pengawasan extends Component
 {
-    use BeriUmpanBalik, KhususPengurus;
+    use BeriUmpanBalik, KhususPengurus, PutuskanPengajuan;
 
     #[Url(as: 'rentang', except: 'hari')]
     public string $rentang = 'hari'; // hari | minggu
@@ -63,6 +66,54 @@ class Pengawasan extends Component
         $this->dispatch('gulir-ke', id: 'periksa');
     }
 
+    // ---- F6 dan R5: tandai selesai, batalkan, catatan, koreksi ----
+
+    private function piket(int $id): ?Penugasan
+    {
+        $p = Penugasan::query()->with('user')->find($id);
+        if (! $p) {
+            $this->toast('Piket tidak ditemukan. Muat ulang halaman.', 'gagal');
+        }
+
+        return $p;
+    }
+
+    public function tandaiSelesai(int $id, PelaksanaanPiket $pelaksanaan): void
+    {
+        if ($p = $this->piket($id)) {
+            $this->coba(fn () => $pelaksanaan->tandaiSelesai($p, auth()->user()), "Piket {$p->user->namaDepan()} ditandai selesai.");
+        }
+    }
+
+    public function batalkanSelesai(int $id, PelaksanaanPiket $pelaksanaan): void
+    {
+        if ($p = $this->piket($id)) {
+            $this->coba(fn () => $pelaksanaan->batalkanSelesai($p, auth()->user()), "Tanda selesai {$p->user->namaDepan()} dibatalkan.");
+        }
+    }
+
+    public function simpanCatatan(int $id, ?string $catatan, PelaksanaanPiket $pelaksanaan): void
+    {
+        if ($p = $this->piket($id)) {
+            $this->coba(fn () => $pelaksanaan->simpanCatatan($p, $catatan, auth()->user()),
+                trim((string) $catatan) === '' ? 'Catatan dihapus.' : "Catatan disimpan. {$p->user->namaDepan()} bisa melihatnya.");
+        }
+    }
+
+    public function koreksi(int $id, string $status, string $catatan, PelaksanaanPiket $pelaksanaan): void
+    {
+        $ke = StatusPenugasan::tryFrom($status);
+        if ($ke === null) {
+            $this->toast('Pilih status koreksinya.', 'gagal');
+
+            return;
+        }
+        if ($p = $this->piket($id)) {
+            $this->coba(fn () => $pelaksanaan->koreksi($p, $ke, $catatan, auth()->user()),
+                "Status piket {$p->user->namaDepan()} dikoreksi menjadi {$ke->label()}.");
+        }
+    }
+
     // ---- Kartu cepat "Atur piket Minggu" (Tahap 2) ----
 
     public function ubahTugasMinggu(int $tugasId, bool $aktif, JadwalMinggu $jadwal): void
@@ -91,7 +142,7 @@ class Pengawasan extends Component
         }
     }
 
-    public function render(JadwalMinggu $jadwal)
+    public function render(JadwalMinggu $jadwal, PelaksanaanPiket $pelaksanaan, IzinPulang $izin)
     {
         $sekarang = CarbonImmutable::now();
         $hariIni = $sekarang->startOfDay();
@@ -152,6 +203,15 @@ class Pengawasan extends Component
             'tugasMinggu' => Tugas::query()->jenis(JenisTugas::KamisMinggu)->urut()->get(),
             'aktifMinggu' => $jadwal->tugasAktif($minggu, SesiTugas::Minggu)->pluck('id')->all(),
             'gengs' => Geng::query()->orderBy('urutan')->get(),
+            // Aksi per baris: tandai (sebelum tenggat), batalkan (selesai, sebelum tenggat), koreksi (setelah tenggat).
+            'aksi' => fn (Penugasan $p) => match (true) {
+                $p->lewatTenggat($sekarang) => 'koreksi',
+                $pelaksanaan->bisaDitandaiPengurus($p, $sekarang) => 'tandai',
+                $p->status === StatusPenugasan::Selesai => 'batal',
+                default => null,
+            },
+            'statusKoreksi' => PelaksanaanPiket::STATUS_KOREKSI,
+            'sedangPulang' => $izin->sedangPulang($senin, $senin->addDays(6)),
         ]);
     }
 
@@ -228,7 +288,7 @@ class Pengawasan extends Component
     /** @return Collection<int, array{hari: string, nama: string, keadaan: string}> petugas harian Senin–Minggu */
     private function pekan($minggu, CarbonImmutable $hariIni): Collection
     {
-        $harian = $minggu->penugasan()->where('jenis', 'harian')->with('user')->get()
+        $harian = $minggu->penugasan()->bukanIzin()->where('jenis', 'harian')->with('user')->get()
             ->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());
         $terbit = $minggu->sudahTerbit('harian');
 

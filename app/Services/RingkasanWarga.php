@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Enums\JenisPenugasan;
 use App\Enums\SesiTugas;
-use App\Enums\StatusPengajuan;
 use App\Enums\StatusPenugasan;
 use App\Models\Geng;
+use App\Models\Izin;
 use App\Models\MingguPiket;
 use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
@@ -150,42 +150,13 @@ class RingkasanWarga
      */
     public function tanggalKosong(int $batas = 8): Collection
     {
-        $besok = $this->sekarang()->addDay()->startOfDay();
+        return $this->ingat("kosong.{$batas}", fn () => app(GantiBintang::class)->tanggalKosong($batas));
+    }
 
-        $minggu = MingguPiket::query()
-            ->where('status_harian', 'terbit')
-            ->whereDate('tanggal_senin', '>=', RotasiGeng::seninDari($besok)->toDateString())
-            ->orderBy('tanggal_senin')
-            ->get();
-
-        if ($minggu->isEmpty()) {
-            return collect();
-        }
-
-        $terisi = Penugasan::query()->where('jenis', JenisPenugasan::Harian->value)
-            ->whereDate('tanggal', '>=', $besok->toDateString())
-            ->pluck('tanggal')->map(fn ($t) => $t->toDateString())->all();
-
-        $diajukan = PengajuanGantiBintang::query()
-            ->whereIn('status', [StatusPengajuan::Menunggu->value, StatusPengajuan::Diterima->value])
-            ->whereDate('tanggal_diajukan', '>=', $besok->toDateString())
-            ->pluck('tanggal_diajukan')->map(fn ($t) => $t->toDateString())->all();
-
-        $hasil = collect();
-        foreach ($minggu as $m) {
-            for ($i = 0; $i < 7; $i++) {
-                $t = $m->senin()->addDays($i);
-                if ($t->lt($besok) || in_array($t->toDateString(), $terisi, true) || in_array($t->toDateString(), $diajukan, true)) {
-                    continue;
-                }
-                $hasil->push($t);
-                if ($hasil->count() >= $batas) {
-                    return $hasil;
-                }
-            }
-        }
-
-        return $hasil;
+    /** @return Collection<int, Izin> Izin pulang milik warga, terbaru di atas. */
+    public function izinSaya(User $user): Collection
+    {
+        return $user->izin()->with('diputuskanOleh')->latest('tanggal_mulai')->limit(10)->get();
     }
 
     /** Petugas harian yang terbit untuk satu tanggal. */
@@ -193,6 +164,7 @@ class RingkasanWarga
     {
         return $this->ingat('harian.'.$tanggal->toDateString(), fn () => Penugasan::query()
             ->terbit()
+            ->bukanIzin()
             ->where('jenis', JenisPenugasan::Harian->value)
             ->whereDate('tanggal', $tanggal->toDateString())
             ->with('user.geng')
@@ -218,7 +190,10 @@ class RingkasanWarga
                 ? $m->penugasan()->terbit()->with(['user.geng', 'tugas'])->get()
                 : collect();
 
-            $harian = $semua->where('jenis', JenisPenugasan::Harian)->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());
+            // Pengganti (bukan Izin) yang ditampilkan kalau di satu hari ada keduanya.
+            $harian = $semua->where('jenis', JenisPenugasan::Harian)
+                ->sortBy(fn (Penugasan $p) => $p->status === StatusPenugasan::Izin ? 0 : 1)
+                ->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());
             $barisHarian = [];
             for ($i = 0; $i < 7; $i++) {
                 $t = $senin->addDays($i);

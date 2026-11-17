@@ -5,7 +5,10 @@ namespace App\Livewire\Warga;
 use App\Enums\JenisPenugasan;
 use App\Enums\StatusPengajuan;
 use App\Enums\StatusPenugasan;
+use App\Livewire\Concerns\BeriUmpanBalik;
+use App\Livewire\Concerns\TandaiSelesaiSendiri;
 use App\Models\Penugasan;
+use App\Services\PelaksanaanPiket;
 use App\Services\RingkasanWarga;
 use App\Services\Tenggat;
 use Carbon\CarbonImmutable;
@@ -18,6 +21,8 @@ use Livewire\Component;
 #[Title('Beranda')]
 class Beranda extends Component
 {
+    use BeriUmpanBalik, TandaiSelesaiSendiri;
+
     public function render(RingkasanWarga $ringkas)
     {
         $user = auth()->user();
@@ -123,6 +128,7 @@ class Beranda extends Component
             StatusPenugasan::Selesai => ['#DCFCE7', '#166534'],
             StatusPenugasan::Bintang => ['#FEE2E2', '#B91C1C'],
             StatusPenugasan::BayarBintang => ['#FFE4CC', '#9A3412'],
+            StatusPenugasan::Izin => ['#E5E7EB', '#374151'],
             default => ['#DCEAF3', '#16587B'],
         };
 
@@ -130,6 +136,7 @@ class Beranda extends Component
         $petunjuk = match (true) {
             $p->status === StatusPenugasan::Selesai => 'Sudah ditandai selesai. Terima kasih!',
             $p->status === StatusPenugasan::Bintang => 'Lewat batas waktu, jadi bintang.',
+            $p->status === StatusPenugasan::Izin => 'Dilepas karena kamu izin pulang.',
             $bisaSekarang => 'Batas '.Tenggat::label($p->tenggatLokal(), $sekarang),
             default => 'Dikerjakan '.$tanggal->translatedFormat('l, j M').'.',
         };
@@ -137,7 +144,10 @@ class Beranda extends Component
             $petunjuk = 'Ganti bintang '.$p->membayar->tanggalLokal()->translatedFormat('j M').'. '.$petunjuk;
         }
 
+        $sendiri = app(PelaksanaanPiket::class)->bisaDitandaiSendiri($p, auth()->user(), $sekarang);
+
         return [
+            'selesai' => $sendiri ? $p->id : null,
             'ikon' => match ($p->jenis) {
                 JenisPenugasan::Harian => 'jam',
                 JenisPenugasan::Kamis => 'piket',
@@ -148,7 +158,7 @@ class Beranda extends Component
             'kicker' => Str::upper($kicker),
             'judul' => $p->jenis === JenisPenugasan::Harian ? 'Semua tugas harian' : $p->namaTugas(),
             'petunjuk' => $petunjuk,
-            'aksi' => $bisaSekarang ? ['label' => 'Lihat', 'rute' => 'warga.piket', 'utama' => true] : null,
+            'aksi' => $bisaSekarang && ! $sendiri ? ['label' => 'Lihat', 'rute' => 'warga.piket', 'utama' => true] : null,
             'badge' => $bisaSekarang ? null : ['kelas' => $p->status->badgeClass(), 'label' => $p->status->label()],
         ];
     }

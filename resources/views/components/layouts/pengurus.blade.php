@@ -1,7 +1,8 @@
 @props(['title' => null])
 @php
     $user = auth()->user();
-    $jumlahPengajuan = \App\Models\PengajuanGantiBintang::query()->where('status', 'menunggu')->count();
+    $jumlahPengajuan = \App\Models\PengajuanGantiBintang::query()->where('status', 'menunggu')->count()
+        + \App\Models\Izin::query()->where('status', 'menunggu')->count();
     $menu = [
         ['pengurus.pengawasan', 'pengurus.pengawasan', 'Pengawasan', 'mata', null],
         ['pengurus.jadwal', 'pengurus.jadwal|pengurus.jadwal-harian', 'Atur jadwal', 'kalender', null],

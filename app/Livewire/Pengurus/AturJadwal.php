@@ -195,7 +195,7 @@ class AturJadwal extends Component
     public function render(JadwalMinggu $jadwal, JadwalHarianPeriode $jadwalPeriode)
     {
         $minggu = $this->minggu()->load('gengHarian');
-        $semua = $minggu->penugasan()->with(['user', 'tugas', 'membayar'])->get();
+        $semua = $minggu->penugasan()->bukanIzin()->with(['user', 'tugas', 'membayar'])->get(); // baris Izin sudah dilepas (R3)
 
         $anggotaHarian = $jadwal->anggotaHarian($minggu);
         $harian = $semua->where('jenis', JenisPenugasan::Harian)->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());

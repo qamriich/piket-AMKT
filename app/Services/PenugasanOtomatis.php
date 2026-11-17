@@ -122,9 +122,11 @@ class PenugasanOtomatis
             $alasan = null;
 
             if (! $pool->has($bintang->user_id)) {
-                $alasan = $sesi === SesiTugas::Kamis
-                    ? 'Pemiliknya sedang piket harian atau tidak aktif'
-                    : 'Pemiliknya tidak aktif';
+                $alasan = match (true) {
+                    $bintang->user?->sedangIzinPada($tanggal) => 'Pemiliknya sedang izin pulang',
+                    $sesi === SesiTugas::Kamis => 'Pemiliknya sedang piket harian atau tidak aktif',
+                    default => 'Pemiliknya tidak aktif',
+                };
             } elseif ($bintang->jenis === JenisPenugasan::KerjaBakti) {
                 // B3a: 1 tugas kecil tambahan dari tugas aktif yang belum dikunci.
                 $tersedia = $tugas->keys()->diff(array_keys($kunci))->values();
@@ -210,6 +212,41 @@ class PenugasanOtomatis
     }
 
     /**
+     * R3: pengganti untuk satu tugas yang dilepas karena izin pulang, dengan aturan B3 langkah 2:
+     * warga di pool yang sedang di asrama (pool sudah tanpa warga yang izin), belum punya tugas reguler
+     * di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Seri: paling lama tidak dapat tugas, lalu acak.
+     *
+     * @param  list<int>  $kecuali
+     */
+    public function pilihPengganti(MingguPiket $minggu, SesiTugas $sesi, int $tugasId, array $kecuali = []): ?User
+    {
+        $tanggal = $sesi === SesiTugas::Kamis ? $minggu->kamis() : $minggu->hariMinggu();
+        $pool = $this->jadwal->pool($minggu, $sesi)->keyBy('id');
+
+        // Tugas reguler = bukan baris Bayar Bintang (pemilik bintang tetap boleh dapat 1 tugas reguler).
+        $punyaReguler = $minggu->penugasan()->bukanIzin()
+            ->whereIn('jenis', $sesi->jenisPenugasan())
+            ->whereNull('membayar_penugasan_id')
+            ->pluck('user_id')->all();
+
+        $calon = $pool->keys()->diff($punyaReguler)->diff($kecuali)->values()->all();
+        if ($calon === []) {
+            return null;
+        }
+
+        [$terakhirTugas, $terakhirApaPun] = $this->riwayat($calon, $minggu, $tanggal);
+        $acakUrut = array_flip(($this->acak)($calon));
+
+        usort($calon, fn (int $a, int $b) => [
+            $terakhirTugas[$a][$tugasId] ?? '', $terakhirApaPun[$a] ?? '', $acakUrut[$a],
+        ] <=> [
+            $terakhirTugas[$b][$tugasId] ?? '', $terakhirApaPun[$b] ?? '', $acakUrut[$b],
+        ]);
+
+        return $pool[$calon[0]];
+    }
+
+    /**
      * Bintang Kamis (untuk Kamis) atau bintang Minggu dan kerja bakti (untuk Minggu) yang belum lunas,
      * dari yang paling lama. Bintang yang sudah punya Bayar Bintang yang sedang berjalan di minggu lain
      * tidak diambil lagi, supaya tidak dijadwalkan dua kali.
@@ -227,7 +264,7 @@ class PenugasanOtomatis
             ->whereDoesntHave('pembayaran', fn ($q) => $q
                 ->where('status', StatusPenugasan::BayarBintang->value)
                 ->where('minggu_piket_id', '!=', $minggu->id))
-            ->with('tugas')
+            ->with(['tugas', 'user'])
             ->orderBy('tanggal')
             ->orderBy('id')
             ->get();
@@ -247,6 +284,7 @@ class PenugasanOtomatis
         $baris = Penugasan::query()
             ->whereIn('user_id', $userIds)
             ->whereIn('jenis', [JenisPenugasan::Kamis->value, JenisPenugasan::Minggu->value])
+            ->where('status', '!=', StatusPenugasan::Izin->value) // tugas yang dilepas karena izin tidak dihitung
             ->where('minggu_piket_id', '!=', $minggu->id)
             ->whereDate('tanggal', '<', $sebelum->toDateString())
             ->get(['user_id', 'tugas_id', 'tanggal']);

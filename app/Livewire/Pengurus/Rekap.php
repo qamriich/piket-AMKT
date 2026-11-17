@@ -4,16 +4,18 @@ namespace App\Livewire\Pengurus;
 
 use App\Enums\StatusPenugasan;
 use App\Livewire\Concerns\KhususPengurus;
+use App\Models\LogAktivitas;
 use App\Models\Penugasan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * F10: rekap bulanan per warga. Ekspor Excel/CSV menyusul di Tahap 4.
+ * F10: rekap bulanan per warga, dengan ekspor CSV (bisa dibuka di Excel).
  */
 #[Layout('components.layouts.pengurus')]
 #[Title('Rekap bulanan')]
@@ -39,7 +41,27 @@ class Rekap extends Component
         $this->mount();
     }
 
-    public function render()
+    /** Ekspor CSV: pemisah titik koma dan BOM UTF-8 supaya langsung rapi di Excel berbahasa Indonesia. */
+    public function ekspor()
+    {
+        [$awal, $warga] = $this->data();
+        $nama = 'rekap-piket-'.$awal->format('Y-m').($this->jenis !== '' ? '-'.$this->jenis : '').'.csv';
+
+        LogAktivitas::catat('rekap.ekspor', null, ['bulan' => $this->bulan, 'jenis' => $this->jenis]);
+
+        return response()->streamDownload(function () use ($warga) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Nama', 'Geng', 'Jumlah piket', 'Selesai', 'Bintang baru', 'Lunas', 'Utang'], ';');
+            foreach ($warga as $w) {
+                fputcsv($out, [$w['user']->nama, $w['user']->geng?->nama ?? '-', $w['terjadwal'], $w['selesai'], $w['bintang_baru'], $w['lunas'], $w['utang']], ';');
+            }
+            fclose($out);
+        }, $nama, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** @return array{0: CarbonImmutable, 1: Collection} */
+    private function data(): array
     {
         $awal = CarbonImmutable::createFromFormat('!Y-m', $this->bulan, config('app.timezone'));
         $akhir = $awal->endOfMonth();
@@ -52,6 +74,7 @@ class Rekap extends Component
 
         $baris = Penugasan::query()
             ->terbit()
+            ->bukanIzin() // piket yang dilepas karena izin pulang tidak dihitung (R3)
             ->whereDate('tanggal', '>=', $awal->toDateString())
             ->whereDate('tanggal', '<=', $akhir->toDateString())
             ->when($jenis, fn ($q) => $q->whereIn('jenis', $jenis))
@@ -78,6 +101,13 @@ class Rekap extends Component
                     'utang' => (int) ($utang[$u->id] ?? 0),
                 ];
             });
+
+        return [$awal, $warga];
+    }
+
+    public function render()
+    {
+        [$awal, $warga] = $this->data();
 
         return view('livewire.pengurus.rekap', [
             'awal' => $awal,

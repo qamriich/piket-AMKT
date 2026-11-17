@@ -12,7 +12,9 @@
                 <option value="kamis">Kamis</option>
                 <option value="minggu">Minggu & kerja bakti</option>
             </select>
-            <button type="button" disabled title="Segera tersedia" class="tombol-kaca"><x-ikon nama="unduh" :ukuran="18" /> Ekspor</button>
+            <button type="button" class="tombol-kaca" wire:click="ekspor" wire:loading.attr="disabled" wire:target="ekspor" title="Unduh CSV, bisa dibuka di Excel">
+                <x-ikon nama="unduh" :ukuran="18" /> Ekspor CSV
+            </button>
         </div>
     </div>
 

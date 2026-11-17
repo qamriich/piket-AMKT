@@ -19,6 +19,7 @@ class Penugasan extends Model
     protected $fillable = [
         'minggu_piket_id', 'user_id', 'tugas_id', 'jenis', 'tanggal', 'tenggat',
         'status', 'membayar_penugasan_id', 'selesai_oleh_id', 'selesai_pada', 'catatan',
+        'pengingat_dikirim_pada', 'diberitahu_pada',
     ];
 
     protected function casts(): array
@@ -29,7 +30,31 @@ class Penugasan extends Model
             'tanggal' => 'immutable_date',
             'tenggat' => 'immutable_datetime',
             'selesai_pada' => 'immutable_datetime',
+            'pengingat_dikirim_pada' => 'immutable_datetime',
+            'diberitahu_pada' => 'immutable_datetime',
         ];
+    }
+
+    /** Baris yang masih memegang tugas atau tanggalnya. Baris Izin sudah dilepas (R3). */
+    public function scopeBukanIzin(Builder $query): Builder
+    {
+        return $query->where('penugasan.status', '!=', StatusPenugasan::Izin->value);
+    }
+
+    /** Ringkasan satu baris untuk email, misalnya "WC 1 · Kamis, 19 Nov · batas Jumat, 20 Nov 18.00". */
+    public function ringkasan(): string
+    {
+        $teks = ($this->jenis === JenisPenugasan::Harian ? 'Piket harian (jam 04.00–09.00)' : $this->namaTugas())
+            .' · '.$this->tanggalLokal()->translatedFormat('l, j M')
+            .' · batas '.$this->tenggatLokal()->translatedFormat('l, j M H.i');
+
+        return $this->status === StatusPenugasan::BayarBintang ? $teks.' (Bayar Bintang)' : $teks;
+    }
+
+    /** Sudah lewat tenggat. */
+    public function lewatTenggat(?CarbonImmutable $sekarang = null): bool
+    {
+        return ($sekarang ?? CarbonImmutable::now())->greaterThan($this->tenggatLokal());
     }
 
     public function mingguPiket(): BelongsTo
@@ -57,6 +82,12 @@ class Penugasan extends Model
     public function pembayaran(): HasMany
     {
         return $this->hasMany(self::class, 'membayar_penugasan_id');
+    }
+
+    /** Pengajuan ganti bintang untuk baris Bintang ini (F8). */
+    public function pengajuanGantiBintang(): HasMany
+    {
+        return $this->hasMany(PengajuanGantiBintang::class, 'penugasan_bintang_id');
     }
 
     public function selesaiOleh(): BelongsTo

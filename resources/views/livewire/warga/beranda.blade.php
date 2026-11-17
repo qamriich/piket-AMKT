@@ -75,7 +75,14 @@
                             <span class="text-[17px] font-extrabold text-tinta">{{ $k['judul'] }}</span>
                             <span class="text-sm leading-snug text-abu">{{ $k['petunjuk'] }}</span>
                         </span>
-                        @if ($k['aksi'])
+                        @if ($k['selesai'] ?? null)
+                            <button type="button" wire:click="selesai({{ $k['selesai'] }})" wire:loading.attr="disabled" wire:target="selesai({{ $k['selesai'] }})"
+                                    class="tekan inline-flex min-h-[48px] flex-none items-center gap-1.5 whitespace-nowrap rounded-xl bg-venice px-3.5 text-sm font-extrabold text-white">
+                                <x-ikon nama="centang" :ukuran="18" :tebal="2.5" />
+                                <span wire:loading.remove wire:target="selesai({{ $k['selesai'] }})">Sudah selesai</span>
+                                <span wire:loading wire:target="selesai({{ $k['selesai'] }})">…</span>
+                            </button>
+                        @elseif ($k['aksi'])
                             <a href="{{ route($k['aksi']['rute']) }}" wire:navigate
                                @class(['tekan inline-flex min-h-[44px] flex-none items-center gap-1 whitespace-nowrap rounded-xl px-3.5 text-sm font-extrabold no-underline',
                                    'bg-venice text-white' => $k['aksi']['utama'],

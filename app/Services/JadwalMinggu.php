@@ -27,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  */
 class JadwalMinggu
 {
-    public function __construct(private JadwalHarianPeriode $periode) {}
+    public function __construct(private JadwalHarianPeriode $periode, private Pemberitahuan $pemberitahuan) {}
 
     public function cari(CarbonInterface $tanggal): ?MingguPiket
     {
@@ -102,13 +102,17 @@ class JadwalMinggu
 
     /**
      * Pool petugas (B3): Kamis = anggota aktif 2 geng non-harian, Minggu = semua warga aktif.
+     * Warga yang izin pulang (disetujui) pada tanggal piket itu tidak masuk pool (R3).
      *
      * @return Collection<int, User>
      */
     public function pool(MingguPiket $minggu, SesiTugas $sesi): Collection
     {
+        $tanggal = $sesi === SesiTugas::Kamis ? $minggu->kamis() : $minggu->hariMinggu();
+
         return User::query()
             ->aktif()
+            ->tidakIzinPada($tanggal)
             ->when($sesi === SesiTugas::Kamis, fn ($q) => $q
                 ->whereNotNull('geng_id')
                 ->where('geng_id', '!=', $minggu->geng_harian_id))
@@ -156,8 +160,11 @@ class JadwalMinggu
         LogAktivitas::catat('jadwal.mode_minggu', $minggu, ['mode' => $mode->value]);
     }
 
-    /** @param  string  $bagian  harian | kamis | minggu */
-    /** @param  string  $bagian  kamis | minggu. Harian tidak diterbitkan: dibuat otomatis dari periode (R1). */
+    /**
+     * Menerbitkan Kamis atau Minggu, lalu mengirim email ke semua warga aktif (bagian 8).
+     *
+     * @param  string  $bagian  kamis | minggu. Harian tidak diterbitkan: dibuat otomatis dari periode (R1).
+     */
     public function terbitkan(MingguPiket $minggu, string $bagian): void
     {
         $sesi = SesiTugas::tryFrom($bagian);
@@ -174,6 +181,8 @@ class JadwalMinggu
 
         $minggu->update(['status_'.$bagian => StatusTerbit::Terbit]);
         LogAktivitas::catat('jadwal.terbit', $minggu, ['bagian' => $bagian]);
+
+        $this->pemberitahuan->jadwalTerbit($minggu, $sesi);
     }
 
     /** Menukar petugas dua tugas reguler di sesi yang sama. Tugas Bayar Bintang terkunci untuk pemiliknya. */
@@ -195,13 +204,27 @@ class JadwalMinggu
         });
 
         LogAktivitas::catat('jadwal.tukar', $a, ['dengan' => $b->id]);
+
+        // B8: setelah terbit, hanya dua warga yang ditukar yang diberi tahu.
+        if ($a->loadMissing('mingguPiket')->mingguPiket->sudahTerbit($a->jenis)) {
+            foreach ([[$a, $b], [$b, $a]] as [$baru, $lama]) {
+                $baru->load(['user', 'tugas']);
+                $lama->loadMissing('tugas');
+                $this->pemberitahuan->berubah($baru->user, 'Piketmu berubah: '.$baru->namaTugas(), [
+                    'Pengurus menukar petugas piket '.$baru->jenis->label().'.',
+                    'Sekarang: '.$baru->ringkasan(),
+                    'Sebelumnya: '.$lama->namaTugas(),
+                ]);
+            }
+        }
     }
 
     /** Mengganti petugas satu tugas reguler, atau mengisi tugas yang belum ada petugasnya. */
     public function aturPetugasTugas(MingguPiket $minggu, SesiTugas $sesi, Tugas $tugas, ?User $user): void
     {
         $jenis = $sesi === SesiTugas::Kamis ? JenisPenugasan::Kamis : JenisPenugasan::Minggu;
-        $baris = $minggu->penugasan()->where('tugas_id', $tugas->id)->where('jenis', $jenis->value)->first();
+        $baris = $minggu->penugasan()->bukanIzin()->where('tugas_id', $tugas->id)->where('jenis', $jenis->value)->with('user')->first();
+        $lama = $baris?->user;
 
         if ($baris && $baris->status !== StatusPenugasan::Terjadwal) {
             throw ValidationException::withMessages(['petugas' => 'Tugas ini terkunci (Bayar Bintang atau sudah dikerjakan).']);
@@ -213,13 +236,18 @@ class JadwalMinggu
             throw ValidationException::withMessages(['petugas' => 'Tugas ini tidak aktif minggu ini.']);
         }
 
+        $terbit = $minggu->sudahTerbit($sesi);
+        $tandai = $terbit ? ['diberitahu_pada' => CarbonImmutable::now()] : [];
+
         if ($user === null) {
             $baris?->delete();
+            $baru = null;
         } elseif ($baris) {
-            $baris->update(['user_id' => $user->id]);
+            $baris->update(['user_id' => $user->id] + $tandai);
+            $baru = $baris;
         } else {
             $tanggal = $sesi === SesiTugas::Kamis ? $minggu->kamis() : $minggu->hariMinggu();
-            Penugasan::create([
+            $baru = Penugasan::create([
                 'minggu_piket_id' => $minggu->id,
                 'user_id' => $user->id,
                 'tugas_id' => $tugas->id,
@@ -227,10 +255,31 @@ class JadwalMinggu
                 'tanggal' => $tanggal->toDateString(),
                 'tenggat' => Tenggat::untuk($jenis, $tanggal),
                 'status' => StatusPenugasan::Terjadwal,
-            ]);
+            ] + $tandai);
         }
 
         LogAktivitas::catat('jadwal.ubah_petugas', $minggu, ['sesi' => $sesi->value, 'tugas' => $tugas->nama, 'user_id' => $user?->id]);
+
+        // B8: setelah terbit, hanya warga yang terdampak yang diberi tahu.
+        if ($terbit && $lama?->id !== $user?->id) {
+            $this->beritahuPergantian($lama, $user, $baru, $tugas->nama, $sesi->label());
+        }
+    }
+
+    /** Email B8 untuk petugas lama (dilepas) dan petugas baru. */
+    private function beritahuPergantian(?User $lama, ?User $baru, ?Penugasan $baris, string $namaTugas, string $sesi): void
+    {
+        if ($lama) {
+            $this->pemberitahuan->berubah($lama, "Piketmu berubah: {$namaTugas} dilepas", [
+                "Pengurus mengubah jadwal piket {$sesi}. Kamu tidak lagi bertugas {$namaTugas}.",
+            ]);
+        }
+        if ($baru && $baris) {
+            $this->pemberitahuan->berubah($baru, "Piket baru untukmu: {$namaTugas}", [
+                "Pengurus mengubah jadwal piket {$sesi}. Kamu sekarang bertugas:",
+                '• '.$baris->load('tugas')->ringkasan(),
+            ]);
+        }
     }
 
     /** Mengisi atau mengosongkan satu hari piket harian (F4). */
@@ -241,7 +290,9 @@ class JadwalMinggu
             throw ValidationException::withMessages(['harian' => 'Tanggal di luar minggu ini.']);
         }
 
-        $baris = Penugasan::query()->where('jenis', 'harian')->whereDate('tanggal', $tanggal->toDateString())->first();
+        // Baris Izin tidak memegang harinya lagi (R3), jadi hari itu bisa diisi pengganti.
+        $baris = Penugasan::query()->bukanIzin()->where('jenis', 'harian')->whereDate('tanggal', $tanggal->toDateString())->with('user')->first();
+        $lama = $baris?->user;
         if ($baris && $baris->status !== StatusPenugasan::Terjadwal) {
             throw ValidationException::withMessages(['harian' => 'Hari ini sudah terisi Bayar Bintang atau sudah dikerjakan.']);
         }
@@ -250,19 +301,26 @@ class JadwalMinggu
             throw ValidationException::withMessages(['harian' => 'Warga ini tidak aktif.']);
         }
 
+        $tenggat = Tenggat::untuk(JenisPenugasan::Harian, $tanggal);
+        // Hari yang sudah lewat tidak perlu diberi tahu; yang akan datang diberi tahu di sini (B8).
+        $beritahu = $tenggat->isFuture() && $lama?->id !== $user?->id;
+        $tandai = $beritahu ? ['diberitahu_pada' => CarbonImmutable::now()] : [];
+
         if ($user === null) {
             $baris?->delete();
+            $baru = null;
         } elseif ($baris) {
-            $baris->update(['user_id' => $user->id]);
+            $baris->update(['user_id' => $user->id] + $tandai);
+            $baru = $baris;
         } else {
-            Penugasan::create([
+            $baru = Penugasan::create([
                 'minggu_piket_id' => $minggu->id,
                 'user_id' => $user->id,
                 'jenis' => JenisPenugasan::Harian,
                 'tanggal' => $tanggal->toDateString(),
-                'tenggat' => Tenggat::untuk(JenisPenugasan::Harian, $tanggal),
+                'tenggat' => $tenggat,
                 'status' => StatusPenugasan::Terjadwal,
-            ]);
+            ] + $tandai);
         }
 
         // Harian tidak punya tombol Terbitkan (R1): perubahan manual langsung terlihat warga.
@@ -271,6 +329,10 @@ class JadwalMinggu
         }
 
         LogAktivitas::catat('jadwal.ubah_harian', $minggu, ['tanggal' => $tanggal->toDateString(), 'user_id' => $user?->id]);
+
+        if ($beritahu) {
+            $this->beritahuPergantian($lama, $user, $baru, 'piket harian '.$tanggal->translatedFormat('l, j M'), 'harian');
+        }
     }
 
     public function pastikanDraf(MingguPiket $minggu, string $bagian): void
