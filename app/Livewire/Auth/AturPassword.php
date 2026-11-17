@@ -11,20 +11,19 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as AturanPassword;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
 /**
- * Halaman dari email: "Buat password" (akun baru, 7 hari) atau "Reset password" (lupa password, 60 menit).
- * Setelah berhasil, warga langsung masuk dan diarahkan sesuai role.
+ * Halaman dari email "Lupa password" (berlaku 60 menit). Password ini buatan warga sendiri,
+ * jadi kewajiban ganti password awal (R2) ikut dimatikan. Setelah berhasil, warga langsung masuk.
  */
 #[Layout('components.layouts.polos')]
+#[Title('Reset password')]
 class AturPassword extends Component
 {
     #[Locked]
     public string $token = '';
-
-    #[Locked]
-    public string $jenis = 'reset'; // buat | reset
 
     public string $email = '';
 
@@ -32,11 +31,9 @@ class AturPassword extends Component
 
     public string $password_confirmation = '';
 
-    public function mount(string $token, ?string $jenis = null): void
+    public function mount(string $token): void
     {
         $this->token = $token;
-        // Dari route: ditentukan nama route. Parameter $jenis hanya untuk test (route tidak punya parameter ini).
-        $this->jenis = $jenis === 'buat' || request()->routeIs('password.buat') ? 'buat' : 'reset';
         $this->email = Str::lower(trim((string) request()->query('email', '')));
     }
 
@@ -54,7 +51,7 @@ class AturPassword extends Component
             'password.min' => 'Password minimal 8 karakter.',
         ]);
 
-        $status = Password::broker($this->jenis === 'buat' ? 'buat' : 'users')->reset(
+        $status = Password::broker()->reset(
             [
                 'email' => $this->email,
                 'password' => $this->password,
@@ -64,6 +61,7 @@ class AturPassword extends Component
             function (User $user, string $password) {
                 $user->forceFill([
                     'password' => $password,
+                    'harus_ganti_password' => false,
                     'remember_token' => Str::random(60),
                     'email_verified_at' => $user->email_verified_at ?? now(),
                 ])->save();
@@ -82,7 +80,7 @@ class AturPassword extends Component
         $user = User::query()->where('email', $this->email)->firstOrFail();
         LogAktivitas::query()->create([
             'user_id' => $user->id,
-            'aksi' => $this->jenis === 'buat' ? 'password.dibuat' : 'password.direset',
+            'aksi' => 'password.direset',
             'subjek_type' => $user->getMorphClass(),
             'subjek_id' => $user->id,
             'ip_address' => request()->ip(),
@@ -96,14 +94,13 @@ class AturPassword extends Component
 
         Auth::login($user);
         session()->regenerate();
-        session()->flash('status', $this->jenis === 'buat' ? 'Password dibuat. Selamat datang!' : 'Password baru disimpan.');
+        session()->flash('status', 'Password baru disimpan.');
 
         return $this->redirect($user->halamanAwal());
     }
 
     public function render()
     {
-        return view('livewire.auth.atur-password')
-            ->title($this->jenis === 'buat' ? 'Buat password' : 'Reset password');
+        return view('livewire.auth.atur-password');
     }
 }

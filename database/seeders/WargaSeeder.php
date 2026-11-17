@@ -11,9 +11,9 @@ use Illuminate\Database\Seeder;
  * Data warga awal (PRD bagian 13): 15 orang, nama panggilan, email sementara <nama>@amkt.test,
  * nomor kamar dikosongkan. Pengurus mengganti email dari halaman Warga & geng.
  *
- * Password: HANYA di lingkungan lokal semua akun diberi password sementara (config piket.password_lokal,
- * default "piket123") supaya bisa dicoba. Di lingkungan lain password dibiarkan kosong; warga membuat
- * password sendiri lewat email "Buat password" yang dikirim pengurus.
+ * Password: HANYA di lingkungan lokal semua akun diberi password awal sementara (config piket.password_lokal,
+ * default "piket123") supaya bisa dicoba; tetap wajib diganti saat login pertama (R2). Di lingkungan lain
+ * password dibiarkan kosong; pengurus mengisinya lewat "Reset password" di halaman Warga & geng.
  */
 class WargaSeeder extends Seeder
 {
@@ -53,15 +53,15 @@ class WargaSeeder extends Seeder
             ]);
 
             if ($lokal) {
-                $user->forceFill(['password' => $passwordLokal, 'email_verified_at' => now()])->save();
+                $user->aturPasswordAwal($passwordLokal);
             }
         }
 
         if ($this->command) {
             $this->command->info(count(self::DATA).' akun warga dibuat (email <nama>@amkt.test).');
             $lokal
-                ? $this->command->warn("Lokal: semua akun memakai password sementara \"{$passwordLokal}\".")
-                : $this->command->warn('Password belum ada. Kirim email "Buat password" dari halaman Warga & geng.');
+                ? $this->command->warn("Lokal: semua akun memakai password awal \"{$passwordLokal}\" (wajib diganti saat login pertama).")
+                : $this->command->warn('Password belum ada. Isi lewat "Reset password" di halaman Warga & geng.');
         }
     }
 }

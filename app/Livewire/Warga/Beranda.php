@@ -78,7 +78,7 @@ class Beranda extends Component
         $besok = $ringkas->harianPada($sekarang->addDay()->startOfDay());
         $terbit = (bool) $ringkas->mingguIni()?->sudahTerbit('harian');
         $petunjuk = match (true) {
-            ! $terbit => 'Jadwal harian minggu ini belum diterbitkan pengurus.',
+            ! $terbit => 'Belum ada jadwal harian untuk minggu ini.',
             $hariIni === null => 'Hari ini kosong, tidak ada petugas harian.',
             $hariIni->status === StatusPenugasan::Selesai => 'Sudah selesai'.($hariIni->selesai_pada ? ' jam '.$hariIni->selesai_pada->format('H.i') : '').'.',
             default => 'Dikerjakan jam 04.00–09.00.',

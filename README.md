@@ -1,6 +1,6 @@
 # Piket AMKT Putri Mulawarman
 
-Sistem penjadwalan piket asrama. Spesifikasi lengkap ada di [PRD (2).md](<PRD (2).md>).
+Sistem penjadwalan piket asrama. Spesifikasi lengkap ada di [PRD (3).md](<PRD (3).md>).
 
 ## Menjalankan di lokal (XAMPP)
 
@@ -16,10 +16,15 @@ php artisan queue:work                             # di terminal lain, supaya em
 
 Buka `http://localhost:8000` lalu login dengan email `<nama>@amkt.test`, misalnya `wilda@amkt.test`
 (Tata Tertib) atau `ping@amkt.test` (warga). **Khusus lokal**, semua akun hasil seeder memakai password
-sementara `piket123`. Di server sungguhan password dibiarkan kosong; pengurus mengirim email
-"Buat password" dari halaman Warga & geng.
+awal `piket123`, yang **wajib diganti saat login pertama** (PRD bagian 15 R2). Di server sungguhan password
+dibiarkan kosong; pengurus mengisinya lewat "Reset password" di halaman Warga & geng.
 
-Setelah login, warga diarahkan ke Beranda warga dan pengurus ke panel pengurus (Pengawasan).
+Setelah login (dan mengganti password awal), warga diarahkan ke Beranda warga dan pengurus ke panel
+pengurus (Pengawasan).
+
+Piket harian disusun sekali per periode di **Atur jadwal → Jadwal harian periode** (R1). Setiap minggu,
+piket harian geng yang bertugas dibuat otomatis tanpa perlu diterbitkan; yang diterbitkan tiap minggu
+hanya piket Kamis dan Minggu.
 
 Email lokal tidak benar-benar dikirim (`MAIL_MAILER=log`). Isinya bisa dibaca di `storage/logs/laravel.log`
 setelah antrean diproses (`php artisan queue:work`, atau `--stop-when-empty` untuk sekali jalan).
@@ -30,15 +35,15 @@ Setelah mengubah tampilan, jalankan `npm run build` (atau `npm run dev` selama m
 
 | Bagian | Alamat |
 | --- | --- |
-| Login | `/login`, `/lupa-password`, link email `/password/buat/{token}` dan `/password/reset/{token}` |
+| Login | `/login`, `/lupa-password`, `/password/baru` (wajib ganti password awal), link email `/password/reset/{token}` |
 | Web warga (5 tab) | `/dashboard`, `/piket`, `/utang`, `/jadwal`, `/kuliah`, dan `/profil` |
-| Panel pengurus | `/pengurus` (pengawasan), `/pengurus/jadwal`, `/pengurus/pengajuan`, `/pengurus/warga`, `/pengurus/rekap`, `/pengurus/pengaturan`, `/pengurus/tugas` |
+| Panel pengurus | `/pengurus` (pengawasan), `/pengurus/jadwal`, `/pengurus/jadwal-harian`, `/pengurus/pengajuan`, `/pengurus/warga`, `/pengurus/rekap`, `/pengurus/pengaturan`, `/pengurus/tugas` |
 
 ## Perintah artisan
 
 | Perintah | Fungsi |
 | --- | --- |
-| `php artisan app:create-admin` | Membuat akun Tata Tertib pertama dan menampilkan link "Buat password" (`--kirim` untuk mengirim email) |
+| `php artisan app:create-admin` | Membuat akun Tata Tertib pertama dengan password awal (`--password=`, kalau kosong dibuat acak) |
 
 ## Test
 

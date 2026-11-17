@@ -33,18 +33,37 @@
         </a>
     @endif
 
-    <button type="button" class="tombol-garis naik t2"
-            wire:loading.attr="disabled" wire:target="kirimGantiPassword"
-            @click="$store.konfirmasi.tanya({
-                judul: 'Ganti password?',
-                pesan: @js('Link untuk membuat password baru dikirim ke '.$user->email.'. Password lamamu tetap berlaku sampai kamu menggantinya.'),
-                tombol: 'Kirim link',
-                aksi: () => $wire.kirimGantiPassword(),
-            })">
-        <x-ikon nama="kunci" :ukuran="20" />
-        <span wire:loading.remove wire:target="kirimGantiPassword">Ganti password lewat email</span>
-        <span wire:loading wire:target="kirimGantiPassword">Mengirim…</span>
-    </button>
+    <section x-data="{ buka: false, lihat: false }" x-on:password-diganti.window="buka = false" class="kartu naik t2 overflow-hidden">
+        <button type="button" @click="buka = !buka" :aria-expanded="buka"
+                class="flex min-h-[56px] w-full items-center justify-between gap-3 px-[18px] text-left">
+            <span class="flex items-center gap-2.5 text-[15px] font-extrabold text-tinta"><x-ikon nama="kunci" :ukuran="20" class="text-venice" /> Ganti password</span>
+            <x-ikon nama="bawah" :ukuran="18" class="text-abu transition-transform" ::class="buka && 'rotate-180'" />
+        </button>
+        <form x-show="buka" x-cloak x-collapse wire:submit="gantiPassword" class="flex flex-col gap-3 border-t border-pasir-muda px-[18px] pb-[18px] pt-4" novalidate>
+            <div>
+                <label for="password_lama" class="label">Password lama</label>
+                <input id="password_lama" :type="lihat ? 'text' : 'password'" type="password" wire:model="password_lama" autocomplete="current-password" class="isian">
+                @error('password_lama') <p class="galat">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label for="password_baru" class="label">Password baru</label>
+                <input id="password_baru" :type="lihat ? 'text' : 'password'" type="password" wire:model="password_baru" autocomplete="new-password" class="isian">
+                @error('password_baru') <p class="galat">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label for="password_baru_confirmation" class="label">Ulangi password baru</label>
+                <input id="password_baru_confirmation" :type="lihat ? 'text' : 'password'" type="password" wire:model="password_baru_confirmation" autocomplete="new-password" class="isian">
+            </div>
+            <label class="flex items-center gap-2 text-sm font-semibold text-abu-tua">
+                <input type="checkbox" x-model="lihat" class="h-4 w-4 accent-[#16587B]"> Tampilkan password
+            </label>
+            <button type="submit" class="tombol-utama" wire:loading.attr="disabled" wire:target="gantiPassword">
+                <span wire:loading.remove wire:target="gantiPassword">Simpan password baru</span>
+                <span wire:loading wire:target="gantiPassword">Menyimpan…</span>
+            </button>
+            <p class="m-0 text-[13px] text-abu">Lupa password lama? Keluar, lalu pakai "Lupa password" di halaman masuk.</p>
+        </form>
+    </section>
 
     <form method="POST" action="{{ route('keluar') }}" class="naik t3">
         @csrf

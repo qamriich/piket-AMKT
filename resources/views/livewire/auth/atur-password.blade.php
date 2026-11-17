@@ -2,14 +2,8 @@
     <span class="letup flex h-14 w-14 items-center justify-center rounded-2xl bg-rock/20 text-rock-muda">
         <x-ikon nama="kunci" :ukuran="28" />
     </span>
-    <h1 class="naik mt-5 text-[30px] font-extrabold leading-tight">{{ $jenis === 'buat' ? 'Buat password' : 'Buat password baru' }}</h1>
-    <p class="naik t1 mt-2 text-[15px] leading-relaxed text-krem">
-        @if ($jenis === 'buat')
-            Satu langkah lagi. Buat password untuk akunmu, lalu kamu langsung masuk.
-        @else
-            Tulis password baru untuk akunmu.
-        @endif
-    </p>
+    <h1 class="naik mt-5 text-[30px] font-extrabold leading-tight">Buat password baru</h1>
+    <p class="naik t1 mt-2 text-[15px] leading-relaxed text-krem">Tulis password baru untuk akunmu, lalu kamu langsung masuk.</p>
 
     <form wire:submit="simpan" class="kartu-kaca naik t2 mt-6 flex flex-col gap-4 p-5" novalidate x-data="{ lihat: false }">
         <div>

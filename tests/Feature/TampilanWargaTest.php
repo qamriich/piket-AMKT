@@ -10,7 +10,6 @@ use App\Models\JadwalKuliah;
 use App\Models\Penugasan;
 use App\Models\Tugas;
 use App\Models\User;
-use App\Notifications\TautanPassword;
 use App\Services\DrafHarian;
 use App\Services\JadwalMinggu;
 use App\Services\PenugasanOtomatis;
@@ -18,7 +17,6 @@ use App\Services\RingkasanWarga;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TugasSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -74,7 +72,7 @@ class TampilanWargaTest extends TestCase
             ->assertSee('Geng 1 piket harian');
         $this->get(route('warga.piket'))->assertSee('Minggu ini kamu bebas piket');
         $this->get(route('warga.utang'))->assertSee('Kamu tidak punya utang piket');
-        $this->get(route('warga.jadwal'))->assertSee('Belum diterbitkan');
+        $this->get(route('warga.jadwal'))->assertSee('Belum ada jadwal');
     }
 
     public function test_draf_tidak_terlihat_warga_sampai_diterbitkan(): void
@@ -83,7 +81,7 @@ class TampilanWargaTest extends TestCase
         $this->actingAs($gita);
 
         $this->get(route('warga.piket'))->assertSee('Minggu ini kamu bebas piket')->assertDontSee('WC 1');
-        $this->get(route('warga.jadwal'))->assertSee('Belum diterbitkan');
+        $this->get(route('warga.jadwal'))->assertSee('Belum ada jadwal');
     }
 
     public function test_setelah_terbit_piket_muncul_di_beranda_piket_dan_jadwal(): void
@@ -133,7 +131,6 @@ class TampilanWargaTest extends TestCase
         $a = User::factory()->create(['geng_id' => $this->geng(1)->id]);
         $minggu = app(JadwalMinggu::class)->siapkan(now());
         app(JadwalMinggu::class)->aturHarian($minggu, CarbonImmutable::parse('2026-11-21', 'Asia/Makassar'), $a);
-        app(JadwalMinggu::class)->terbitkan($minggu, 'harian');
 
         $kosong = app(RingkasanWarga::class)->tanggalKosong()->map->toDateString()->all();
 
@@ -177,20 +174,6 @@ class TampilanWargaTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         Livewire::test(JadwalKuliahEditor::class, ['userId' => $orang->id])->assertForbidden();
-    }
-
-    public function test_ganti_password_dari_profil_mengirim_link_ke_email_sendiri_dan_dibatasi(): void
-    {
-        Notification::fake();
-        $saya = User::factory()->create(['email' => 'ping@contoh.test']);
-        $this->actingAs($saya);
-
-        Livewire::test(Profil::class)->call('kirimGantiPassword')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'sukses');
-        Notification::assertSentTo($saya, TautanPassword::class, fn (TautanPassword $n) => $n->jenis === TautanPassword::RESET);
-
-        // Percobaan kedua dalam 10 menit ditolak.
-        Livewire::test(Profil::class)->call('kirimGantiPassword')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
-        Notification::assertSentToTimes($saya, TautanPassword::class, 1);
     }
 
     public function test_warga_biasa_tidak_bisa_menjalankan_komponen_pengurus(): void

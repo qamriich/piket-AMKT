@@ -255,12 +255,12 @@
             <section class="kartu-kaca naik t5 flex flex-col gap-3.5 rounded-3xl p-[22px]">
                 <div class="flex flex-col gap-0.5">
                     <h2 class="m-0 text-lg font-extrabold">Atur piket Minggu, {{ $minggu->hariMinggu()->translatedFormat('j M') }}</h2>
-                    <span class="text-sm text-rock-muda">{{ $mingguTerbit ? 'Sudah diterbitkan' : 'Belum diterbitkan' }}</span>
+                    <span class="text-sm text-rock-muda">{{ $minggu->kerjaBakti() ? 'Kerja bakti' : 'Tugas kecil' }}</span>
                 </div>
 
                 @if ($mingguTerbit)
                     <p class="m-0 rounded-xl bg-white/[.06] px-3.5 py-3 text-[15px] leading-normal text-krem">
-                        {{ $minggu->kerjaBakti() ? 'Kerja bakti' : 'Pembagian tugas kecil' }} sudah terbit dan bisa dilihat semua warga.
+                        {{ $minggu->kerjaBakti() ? 'Daftar kerja bakti' : 'Pembagian tugas kecil' }} sudah bisa dilihat semua warga.
                     </p>
                     <a href="{{ route('pengurus.jadwal', ['minggu' => $minggu->tanggal_senin->toDateString(), 'tab' => 'minggu']) }}" wire:navigate class="tombol-kaca no-underline">Lihat pembagian</a>
                 @else

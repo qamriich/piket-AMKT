@@ -9,18 +9,14 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Email "Buat password" (akun baru, berlaku 7 hari) atau "Reset password" (lupa password, berlaku 60 menit).
+ * Email "Lupa password" (berlaku 60 menit), berbahasa Indonesia.
  * Payload antrean dienkripsi karena memuat token.
  */
 class TautanPassword extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 
-    public const BUAT = 'buat';
-
-    public const RESET = 'reset';
-
-    public function __construct(public string $token, public string $jenis = self::BUAT) {}
+    public function __construct(public string $token) {}
 
     public function via(object $notifiable): array
     {
@@ -29,7 +25,7 @@ class TautanPassword extends Notification implements ShouldBeEncrypted, ShouldQu
 
     public function url(object $notifiable): string
     {
-        return route($this->jenis === self::BUAT ? 'password.buat' : 'password.reset', [
+        return route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
         ]);
@@ -37,19 +33,8 @@ class TautanPassword extends Notification implements ShouldBeEncrypted, ShouldQu
 
     public function toMail(object $notifiable): MailMessage
     {
-        $pesan = (new MailMessage)->greeting('Halo, '.$notifiable->nama);
-
-        if ($this->jenis === self::BUAT) {
-            return $pesan
-                ->subject('Buat password untuk web piket AMKT Putri')
-                ->line('Akunmu di web jadwal piket Asrama Mahasiswa Kalimantan Timur Putri Mulawarman Makassar sudah dibuat oleh pengurus.')
-                ->line('Tekan tombol di bawah untuk membuat password. Setelah itu kamu bisa login dengan email ini dan password tersebut.')
-                ->action('Buat password', $this->url($notifiable))
-                ->line('Link ini berlaku 7 hari. Kalau sudah lewat, minta pengurus mengirim ulang atau pakai "Lupa password" di halaman login.')
-                ->salutation('Salam, Pengurus AMKT Putri Mulawarman');
-        }
-
-        return $pesan
+        return (new MailMessage)
+            ->greeting('Halo, '.$notifiable->nama)
             ->subject('Reset password web piket AMKT Putri')
             ->line('Kami menerima permintaan untuk mengganti password akunmu.')
             ->action('Buat password baru', $this->url($notifiable))

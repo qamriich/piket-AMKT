@@ -28,8 +28,10 @@
             <button type="button" role="tab" class="segmen-gelap-tombol inline-flex items-center gap-2 !min-h-[44px] !px-4 !text-[15px]"
                     aria-selected="{{ $tab === $k ? 'true' : 'false' }}" wire:click="pilihTab('{{ $k }}')">
                 {{ $label }}
-                <span @class(['h-2 w-2 rounded-full', 'bg-green-400' => $statusBagian($k), 'bg-amber-300' => ! $statusBagian($k)])
-                      title="{{ $statusBagian($k) ? 'Terbit' : 'Draf' }}"></span>
+                @if ($k !== 'harian')
+                    <span @class(['h-2 w-2 rounded-full', 'bg-green-400' => $statusBagian($k), 'bg-amber-300' => ! $statusBagian($k)])
+                          title="{{ $statusBagian($k) ? 'Terbit' : 'Draf' }}"></span>
+                @endif
             </button>
         @endforeach
     </div>
@@ -40,7 +42,8 @@
     </div>
 
     <div wire:loading.remove wire:target="pindahMinggu, mingguIni, pilihTab" wire:key="panel-{{ $tab }}-{{ $minggu->id }}" class="halaman flex flex-col gap-5">
-        {{-- Status bagian --}}
+        {{-- Status bagian (hanya Kamis dan Minggu yang diterbitkan, R1) --}}
+        @if ($tab !== 'harian')
         <div @class(['flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3.5',
                 'border-green-300/30 bg-green-500/10' => $statusBagian($tab), 'border-amber-200/30 bg-amber-300/10' => ! $statusBagian($tab)])>
             <span class="flex items-center gap-2.5 text-[15px] font-semibold">
@@ -52,12 +55,12 @@
                 @endif
             </span>
             @php
-                $adaIsi = $tab === 'harian' ? $harianAda : $sesi[$tab]['baris']->isNotEmpty();
+                $adaIsi = $sesi[$tab]['baris']->isNotEmpty();
             @endphp
             @unless ($statusBagian($tab))
                 <button type="button" class="tombol-merino !min-h-[48px]" @disabled(! $adaIsi)
                         @click="$store.konfirmasi.tanya({
-                            judul: @js('Terbitkan jadwal '.($tab === 'harian' ? 'harian' : $labelTab[$tab]).'?'),
+                            judul: @js('Terbitkan jadwal '.$labelTab[$tab].'?'),
                             pesan: 'Setelah terbit, semua warga bisa melihat jadwal ini dan daftar tugasnya tidak bisa diubah lagi. Petugas masih bisa ditukar.',
                             tombol: 'Terbitkan',
                             aksi: () => $wire.terbitkan(@js($tab)),
@@ -66,6 +69,7 @@
                 </button>
             @endunless
         </div>
+        @endif
 
         @if ($catatan[$tab] !== [])
             <div class="letup flex flex-col gap-1.5 rounded-2xl border border-amber-200/40 bg-amber-300/10 px-4 py-3.5 text-[15px] leading-normal text-amber-100">
@@ -78,27 +82,27 @@
 
         @if ($tab === 'harian')
             {{-- ================= HARIAN ================= --}}
+            <div @class(['flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3.5',
+                    'border-rock/35 bg-rock/10' => $periodeMinggu->isNotEmpty(), 'border-amber-200/30 bg-amber-300/10' => $periodeMinggu->isEmpty()])>
+                <span class="flex items-start gap-2.5 text-[15px] font-semibold leading-normal">
+                    <x-ikon nama="info" :ukuran="18" class="mt-0.5 flex-none" />
+                    @if ($periodeMinggu->isNotEmpty())
+                        <span>Dibuat otomatis dari jadwal periode <strong>{{ $periodeMinggu->pluck('nama')->join(', ') }}</strong>. Tidak perlu diterbitkan; warga langsung melihatnya.</span>
+                    @else
+                        <span>Belum ada jadwal harian periode yang mencakup minggu ini. Buat dulu, nanti piket harian terisi otomatis tiap minggu.</span>
+                    @endif
+                </span>
+                <a href="{{ route('pengurus.jadwal-harian') }}" wire:navigate class="tombol-merino !min-h-[48px] no-underline">
+                    <x-ikon nama="kalender" :ukuran="18" /> {{ $periodeMinggu->isNotEmpty() ? 'Ubah jadwal periode' : 'Buat jadwal periode' }}
+                </a>
+            </div>
+
             <section class="kartu-kaca flex flex-col gap-4 rounded-3xl p-[18px] sm:p-[22px]">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="flex max-w-xl flex-col gap-1">
-                        <h2 class="m-0 text-xl font-extrabold">Piket harian · {{ $minggu->gengHarian?->nama }}</h2>
-                        <span class="text-sm leading-normal text-rock-muda">
-                            {{ $anggotaHarian->count() }} anggota aktif. Draf otomatis memakai jadwal kuliah: 1 orang maksimal 1 hari, hari yang tidak terisi tetap kosong untuk ganti bintang.
-                        </span>
-                    </div>
-                    @unless ($statusBagian('harian'))
-                        <button type="button" class="tombol-rock"
-                                @if ($harianAda)
-                                    @click="$store.konfirmasi.tanya({ judul: 'Susun ulang draf harian?', pesan: 'Pembagian hari yang sekarang akan diganti dengan saran baru dari jadwal kuliah.', tombol: 'Susun ulang', aksi: () => $wire.buatDrafHarian() })"
-                                @else
-                                    wire:click="buatDrafHarian"
-                                @endif
-                                wire:loading.attr="disabled" wire:target="buatDrafHarian">
-                            <x-ikon nama="acak" :ukuran="18" />
-                            <span wire:loading.remove wire:target="buatDrafHarian">{{ $harianAda ? 'Susun ulang draf' : 'Buat draf otomatis' }}</span>
-                            <span wire:loading wire:target="buatDrafHarian">Menyusun…</span>
-                        </button>
-                    @endunless
+                <div class="flex max-w-2xl flex-col gap-1">
+                    <h2 class="m-0 text-xl font-extrabold">Piket harian minggu ini · {{ $minggu->gengHarian?->nama }}</h2>
+                    <span class="text-sm leading-normal text-rock-muda">
+                        Kalau petugas berhalangan minggu ini, pilih pengganti di hari itu. Perubahan ini hanya untuk minggu ini; jadwal periode tidak berubah.
+                    </span>
                 </div>
 
                 <div class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
@@ -129,23 +133,28 @@
                                 <select aria-label="Petugas {{ $h['tanggal']->translatedFormat('l, j M') }}" class="isian-gelap !min-h-[46px] text-[15px]"
                                         wire:change="aturHarian('{{ $h['tanggal']->toDateString() }}', $event.target.value)">
                                     <option value="" @selected(! $p)>— Kosong —</option>
-                                    @foreach ($anggotaHarian as $a)
-                                        <option value="{{ $a->id }}" @selected($p?->user_id === $a->id)>{{ $a->nama }}</option>
-                                    @endforeach
+                                    <optgroup label="{{ $minggu->gengHarian?->nama }}">
+                                        @foreach ($anggotaHarian as $a)
+                                            <option value="{{ $a->id }}" @selected($p?->user_id === $a->id)>{{ $a->nama }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                    <optgroup label="Pengganti dari geng lain">
+                                        @foreach ($wargaLain as $a)
+                                            <option value="{{ $a->id }}" @selected($p?->user_id === $a->id)>{{ $a->nama }}</option>
+                                        @endforeach
+                                    </optgroup>
                                 </select>
                                 @if ($ganda)
-                                    <span class="text-xs font-semibold text-amber-200">Orang ini dapat lebih dari 1 hari.</span>
+                                    <span class="text-xs font-semibold text-amber-200">Orang ini dapat lebih dari 1 hari minggu ini.</span>
                                 @endif
-                                <span class="text-xs leading-snug text-rock-muda">
-                                    Bisa: {{ $h['bisa']->isNotEmpty() ? $h['bisa']->join(', ') : 'tidak ada (semua kuliah pagi)' }}
-                                </span>
+                                @unless ($h['periode'])
+                                    <span class="text-xs leading-snug text-rock-muda">Di luar periode jadwal harian.</span>
+                                @endunless
                             @endif
                         </div>
                     @endforeach
                 </div>
-                @if ($statusBagian('harian'))
-                    <p class="m-0 text-[13px] text-rock-muda">Perubahan petugas setelah terbit tetap tercatat di log aktivitas. Email pemberitahuan ke warga yang terdampak aktif di tahap berikutnya.</p>
-                @endif
+                <p class="m-0 text-[13px] text-rock-muda">Setiap perubahan tercatat di log aktivitas.</p>
             </section>
         @else
             {{-- ================= KAMIS / MINGGU ================= --}}

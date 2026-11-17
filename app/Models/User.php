@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -38,6 +39,7 @@ class User extends Authenticatable
             'aktif' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'harus_ganti_password' => 'boolean',
         ];
     }
 
@@ -82,16 +84,33 @@ class User extends Authenticatable
         return $this->password !== null;
     }
 
-    /** Halaman tujuan setelah login: pengurus ke Pengawasan, warga ke Beranda (PRD bagian 2 poin 4). */
+    /**
+     * Halaman tujuan setelah login: pengurus ke Pengawasan, warga ke Beranda (PRD bagian 2 poin 4).
+     * Selama password awal belum diganti, semua diarahkan ke "Buat password baru" (R2).
+     */
     public function halamanAwal(): string
     {
+        if ($this->harus_ganti_password) {
+            return route('password.baru');
+        }
+
         return $this->isPengurus() ? route('pengurus.pengawasan') : route('dashboard');
+    }
+
+    /** Pengurus mengisi password awal; warga wajib menggantinya saat login berikutnya (R2). */
+    public function aturPasswordAwal(string $password): void
+    {
+        $this->forceFill([
+            'password' => $password,
+            'harus_ganti_password' => true,
+            'remember_token' => Str::random(60),
+        ])->save();
     }
 
     /** Email "Lupa password" (dikirim oleh password broker Laravel), berbahasa Indonesia. */
     public function sendPasswordResetNotification($token): void
     {
-        $this->notify(new TautanPassword($token, TautanPassword::RESET));
+        $this->notify(new TautanPassword($token));
     }
 
     public function namaDepan(): string

@@ -150,5 +150,7 @@ class MasterTugasDanPengaturanTest extends TestCase
 
         $this->assertSame(15, User::query()->whereNotNull('password')->count());
         $this->assertTrue(Hash::check('piket123', User::query()->where('nama', 'Ping')->value('password')));
+        // R2: password awal lokal tetap wajib diganti saat login pertama.
+        $this->assertSame(15, User::query()->where('harus_ganti_password', true)->count());
     }
 }

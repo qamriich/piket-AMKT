@@ -43,7 +43,8 @@ class RingkasanWarga
 
     public function mingguIni(): ?MingguPiket
     {
-        return $this->ingat('minggu', fn () => $this->jadwal->cari($this->sekarang())?->load('gengHarian'));
+        // siapkan(): sekalian membuat penugasan harian minggu ini dari jadwal periode kalau belum (R1).
+        return $this->ingat('minggu', fn () => $this->jadwal->siapkan($this->sekarang())->load('gengHarian'));
     }
 
     /** Geng harian minggu ini: dari baris minggu kalau sudah dibuat, kalau belum dari rotasi. */

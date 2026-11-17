@@ -27,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  */
 class JadwalMinggu
 {
+    public function __construct(private JadwalHarianPeriode $periode) {}
+
     public function cari(CarbonInterface $tanggal): ?MingguPiket
     {
         return MingguPiket::query()
@@ -41,8 +43,18 @@ class JadwalMinggu
      */
     public function siapkan(CarbonInterface $tanggal): MingguPiket
     {
-        $senin = RotasiGeng::seninDari($tanggal);
+        $minggu = $this->cariAtauBuat(RotasiGeng::seninDari($tanggal));
 
+        // R1: penugasan harian dibuat otomatis dari jadwal periode (sekali per minggu).
+        if ($this->periode->terapkan($minggu) > 0) {
+            $minggu->refresh();
+        }
+
+        return $minggu;
+    }
+
+    private function cariAtauBuat(CarbonImmutable $senin): MingguPiket
+    {
         if ($ada = $this->cari($senin)) {
             return $ada;
         }
@@ -145,11 +157,17 @@ class JadwalMinggu
     }
 
     /** @param  string  $bagian  harian | kamis | minggu */
+    /** @param  string  $bagian  kamis | minggu. Harian tidak diterbitkan: dibuat otomatis dari periode (R1). */
     public function terbitkan(MingguPiket $minggu, string $bagian): void
     {
+        $sesi = SesiTugas::tryFrom($bagian);
+        if ($sesi === null) {
+            throw ValidationException::withMessages(['jadwal' => 'Jadwal harian dibuat otomatis dari jadwal periode, tidak perlu diterbitkan.']);
+        }
+
         $this->pastikanDraf($minggu, $bagian);
 
-        $jenis = $bagian === 'harian' ? ['harian'] : SesiTugas::from($bagian)->jenisPenugasan();
+        $jenis = $sesi->jenisPenugasan();
         if (! $minggu->penugasan()->whereIn('jenis', $jenis)->exists()) {
             throw ValidationException::withMessages(['jadwal' => 'Belum ada pembagian yang bisa diterbitkan.']);
         }
@@ -227,8 +245,9 @@ class JadwalMinggu
         if ($baris && $baris->status !== StatusPenugasan::Terjadwal) {
             throw ValidationException::withMessages(['harian' => 'Hari ini sudah terisi Bayar Bintang atau sudah dikerjakan.']);
         }
-        if ($user && (! $user->aktif || $user->geng_id !== $minggu->geng_harian_id)) {
-            throw ValidationException::withMessages(['harian' => 'Pilih anggota aktif geng yang bertugas minggu ini.']);
+        // Pengganti boleh warga aktif mana pun (misalnya saat petugasnya izin pulang, R3).
+        if ($user && ! $user->aktif) {
+            throw ValidationException::withMessages(['harian' => 'Warga ini tidak aktif.']);
         }
 
         if ($user === null) {
@@ -244,6 +263,11 @@ class JadwalMinggu
                 'tenggat' => Tenggat::untuk(JenisPenugasan::Harian, $tanggal),
                 'status' => StatusPenugasan::Terjadwal,
             ]);
+        }
+
+        // Harian tidak punya tombol Terbitkan (R1): perubahan manual langsung terlihat warga.
+        if (! $minggu->sudahTerbit('harian')) {
+            $minggu->update(['status_harian' => StatusTerbit::Terbit]);
         }
 
         LogAktivitas::catat('jadwal.ubah_harian', $minggu, ['tanggal' => $tanggal->toDateString(), 'user_id' => $user?->id]);

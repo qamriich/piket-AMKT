@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAkunAktif;
 use App\Http\Middleware\EnsurePengurus;
+use App\Http\Middleware\WajibGantiPassword;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             EnsureAkunAktif::class,
+            WajibGantiPassword::class,
         ]);
 
         // Tamu ke halaman login; yang sudah login (misalnya membuka /login lagi) ke halaman sesuai role.

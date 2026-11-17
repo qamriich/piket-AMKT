@@ -36,7 +36,7 @@
             @if (! $jadwal[$k]['terbit'])
                 <div class="kartu flex flex-col items-center gap-2 px-6 py-8 text-center lg:py-14">
                     <x-ikon nama="jam" :ukuran="28" class="text-rock" />
-                    <span class="text-base font-extrabold text-tinta">Belum diterbitkan</span>
+                    <span class="text-base font-extrabold text-tinta">Belum ada jadwal</span>
                     <span class="text-sm text-abu-tua">Pengurus sedang menyusun jadwal {{ $k === 'harian' ? 'harian' : ucfirst($k) }} minggu ini.</span>
                 </div>
             @elseif ($k === 'minggu' && $jadwal['minggu']['kerja_bakti'])

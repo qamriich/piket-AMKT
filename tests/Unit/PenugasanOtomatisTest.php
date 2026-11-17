@@ -16,6 +16,7 @@ use App\Services\JadwalMinggu;
 use App\Services\PenugasanOtomatis;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -317,7 +318,7 @@ class PenugasanOtomatisTest extends TestCase
         $m = $this->minggu('2026-11-16', ['WC 1']);
         $m->update(['status_kamis' => 'terbit']);
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         app(PenugasanOtomatis::class)->bagikan($m, SesiTugas::Kamis);
     }
 
@@ -357,7 +358,7 @@ class PenugasanOtomatisTest extends TestCase
         $this->assertSame($u2, $r1->fresh()->user_id);
         $this->assertSame($u1, $r2->fresh()->user_id);
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         app(JadwalMinggu::class)->tukar($bayar, $r1);
     }
 }

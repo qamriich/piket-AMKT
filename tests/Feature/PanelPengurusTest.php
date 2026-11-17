@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Enums\SesiTugas;
 use App\Enums\StatusPenugasan;
 use App\Livewire\Pengurus\AturJadwal;
+use App\Livewire\Pengurus\JadwalHarian;
 use App\Livewire\Pengurus\Pengawasan;
 use App\Livewire\Pengurus\Rekap;
 use App\Models\MingguPiket;
 use App\Models\Penugasan;
+use App\Models\PeriodeHarian;
 use App\Models\Tugas;
 use App\Models\User;
 use App\Services\JadwalMinggu;
@@ -82,25 +84,64 @@ class PanelPengurusTest extends TestCase
         $this->get(route('dashboard'))->assertOk()->assertDontSee('Panel pengurus');
     }
 
-    public function test_alur_harian_buat_draf_ubah_lalu_terbitkan(): void
+    public function test_alur_jadwal_harian_periode_dari_halaman_sampai_otomatis_di_minggu_ini(): void
     {
         $this->masukSebagaiPengurus();
         $this->warga(1, 3);
-        $lain = User::factory()->create(['geng_id' => $this->geng(2)->id]);
+        $this->warga(2, 2);
 
-        $c = Livewire::test(AturJadwal::class)->call('buatDrafHarian')->assertDispatched('toast');
-        $minggu = MingguPiket::query()->firstOrFail();
+        // Belum ada periode: tab Harian di Atur jadwal mengajak membuat periode, tanpa tombol Terbitkan.
+        $this->get(route('pengurus.jadwal'))->assertOk()->assertSee('Buat jadwal periode')->assertDontSee('Buat draf otomatis');
+
+        $c = Livewire::test(JadwalHarian::class)
+            ->set('nama', 'Semester Ganjil 2026/2027')
+            ->set('mulai', '2026-11-16')
+            ->set('selesai', '2027-01-31')
+            ->call('simpanPeriode')
+            ->assertHasNoErrors()
+            ->assertDispatched('toast');
+        $periode = PeriodeHarian::query()->firstOrFail();
+        $c->assertSet('periodeId', $periode->id);
+
+        // Draf dari jadwal kuliah (B2) untuk semua geng, lalu simpan.
+        $c->call('susunSemua')->assertSet('adaPerubahan', true);
+        $this->assertCount(3, array_filter($c->get('peta')[$this->geng(1)->id]));
+        $c->call('simpanJadwal')->assertSet('adaPerubahan', false);
+        $this->assertSame(5, $periode->hari()->count());
+
+        // Minggu ini (Geng 1) belum pernah dibuat, jadi langsung terisi otomatis dan terlihat warga.
+        $minggu = app(JadwalMinggu::class)->siapkan(now());
         $this->assertSame(3, $minggu->penugasan()->where('jenis', 'harian')->count());
-
-        // Mengosongkan hari dan menolak warga dari geng lain.
-        $hari = $minggu->penugasan()->where('jenis', 'harian')->first()->tanggal->toDateString();
-        $c->call('aturHarian', $hari, '');
-        $this->assertSame(2, $minggu->penugasan()->where('jenis', 'harian')->count());
-        $c->call('aturHarian', $hari, $lain->id)->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
-
-        $c->call('terbitkan', 'harian');
         $this->assertTrue($minggu->fresh()->sudahTerbit('harian'));
-        $this->get(route('pengurus.jadwal'))->assertSee('Sudah diterbitkan');
+
+        // Pengganti per tanggal: boleh dari geng lain.
+        $lain = User::query()->where('geng_id', $this->geng(2)->id)->firstOrFail();
+        $hari = $minggu->penugasan()->where('jenis', 'harian')->first()->tanggal->toDateString();
+        Livewire::test(AturJadwal::class)->call('aturHarian', $hari, $lain->id)->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'sukses');
+        $this->assertSame($lain->id, Penugasan::query()->where('jenis', 'harian')->whereDate('tanggal', $hari)->value('user_id'));
+
+        // Harian tidak bisa diterbitkan manual.
+        Livewire::test(AturJadwal::class)->call('terbitkan', 'harian')->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
+
+        $this->get(route('pengurus.jadwal'))->assertSee('Dibuat otomatis dari jadwal periode')->assertSee('Semester Ganjil 2026/2027');
+        $this->get(route('pengurus.jadwal-harian'))->assertOk()->assertSee('Berlaku sekarang');
+    }
+
+    public function test_jadwal_periode_menolak_satu_orang_dua_hari(): void
+    {
+        $this->masukSebagaiPengurus();
+        $this->warga(1, 2);
+        $orang = User::query()->where('geng_id', $this->geng(1)->id)->where('role', 'warga')->firstOrFail();
+
+        $c = Livewire::test(JadwalHarian::class)
+            ->set('nama', 'Periode A')->set('mulai', '2026-11-16')->set('selesai', '2026-12-31')
+            ->call('simpanPeriode')
+            ->set('peta.'.$this->geng(1)->id.'.1', (string) $orang->id)
+            ->set('peta.'.$this->geng(1)->id.'.2', (string) $orang->id)
+            ->call('simpanJadwal')
+            ->assertDispatched('toast', fn ($n, $p) => $p['jenis'] === 'gagal');
+
+        $this->assertSame(0, PeriodeHarian::query()->firstOrFail()->hari()->count());
     }
 
     public function test_alur_kamis_toggle_bagikan_tukar_terbitkan(): void
@@ -165,14 +206,14 @@ class PanelPengurusTest extends TestCase
         $this->masukSebagaiPengurus();
         $biasa = User::factory()->create(['nama' => 'Ayu Biasa', 'geng_id' => $this->geng(1)->id]);
         $diperiksa = User::factory()->create(['nama' => 'Wulan Periksa', 'geng_id' => $this->geng(1)->id, 'wajib_diperiksa' => true]);
+        // Belum ada jadwal harian: tidak ada yang muncul.
+        Livewire::test(Pengawasan::class)->assertDontSee('Wulan Periksa');
+
+        // Harian langsung terlihat begitu diisi (tanpa Terbitkan, R1).
         $minggu = app(JadwalMinggu::class)->siapkan(now());
         app(JadwalMinggu::class)->aturHarian($minggu, CarbonImmutable::parse('2026-11-18', 'Asia/Makassar'), $diperiksa);
         app(JadwalMinggu::class)->aturHarian($minggu, CarbonImmutable::parse('2026-11-19', 'Asia/Makassar'), $biasa);
 
-        // Belum terbit: tidak muncul.
-        Livewire::test(Pengawasan::class)->assertDontSee('Wulan Periksa');
-
-        app(JadwalMinggu::class)->terbitkan($minggu, 'harian');
         Livewire::test(Pengawasan::class)
             ->assertSee('Wulan Periksa')->assertSee('Wajib diperiksa')->assertDontSee('Ayu Biasa')
             ->call('setRentang', 'minggu')

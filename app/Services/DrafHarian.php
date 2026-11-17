@@ -3,21 +3,18 @@
 namespace App\Services;
 
 use App\Enums\JenisPenugasan;
-use App\Enums\StatusPenugasan;
+use App\Models\Geng;
 use App\Models\JadwalKuliah;
-use App\Models\LogAktivitas;
-use App\Models\MingguPiket;
 use App\Models\Pengaturan;
 use App\Models\Penugasan;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Aturan B2: saran pembagian hari piket harian.
+ * Aturan B2: saran pembagian hari piket harian. Sejak revisi R1 (PRD bagian 15) dipakai untuk
+ * menyusun draf jadwal harian PERIODE per geng, bukan per minggu.
  *
- * 1. Kandidat = anggota aktif geng yang bertugas.
+ * 1. Kandidat = anggota aktif geng.
  * 2. Warga *bisa* pada hari D kalau tidak ada kuliah hari itu, atau kuliah pertamanya
  *    dimulai pada/setelah batas_jam_kuliah.
  * 3. Maksimal 1 hari per orang. Warga dengan hari *bisa* paling sedikit diisi lebih dulu.
@@ -27,39 +24,20 @@ use Illuminate\Support\Facades\DB;
  */
 class DrafHarian
 {
-    public function __construct(private JadwalMinggu $jadwal) {}
-
     /**
-     * Menghitung saran tanpa menyimpan.
-     *
      * @return array{
-     *     jadwal: array<string, int|null>,
+     *     jadwal: array<int, int|null>,
      *     bisa: array<int, list<int>>,
      *     peringatan: list<string>
-     * } jadwal: tanggal Y-m-d => user_id (null = kosong); bisa: user_id => hari ISO (1–7)
+     * } jadwal: hari ISO (1–7) => user_id (null = kosong); bisa: user_id => hari ISO
      */
-    public function susun(MingguPiket $minggu): array
+    public function susunUntukGeng(Geng $geng): array
     {
-        $senin = $minggu->senin();
-        $tanggal = [];
-        for ($h = 1; $h <= 7; $h++) {
-            $tanggal[$h] = $senin->addDays($h - 1);
-        }
-
-        // Hari yang sudah terkunci (Bayar Bintang dari pengajuan, atau sudah dikerjakan) tidak disentuh.
-        $terkunci = Penugasan::query()
-            ->where('jenis', JenisPenugasan::Harian->value)
-            ->where('status', '!=', StatusPenugasan::Terjadwal->value)
-            ->whereDate('tanggal', '>=', $tanggal[1]->toDateString())
-            ->whereDate('tanggal', '<=', $tanggal[7]->toDateString())
-            ->get()
-            ->mapWithKeys(fn (Penugasan $p) => [$p->tanggalLokal()->dayOfWeekIso => $p->user_id]);
-
-        $kandidat = $this->jadwal->anggotaHarian($minggu)->sortBy('id')->values();
+        $kandidat = User::query()->aktif()->where('geng_id', $geng->id)->orderBy('id')->get();
         $bisa = $this->hariBisa($kandidat);
-        $sebelumnya = $this->hariGiliranSebelumnya($kandidat, $senin);
+        $sebelumnya = $this->hariGiliranSebelumnya($kandidat);
 
-        $terisi = $terkunci->all(); // hari ISO => user_id
+        $terisi = []; // hari ISO => user_id
         $peringatan = [];
 
         // Paling sedikit hari bisa diisi lebih dulu; seri diurutkan id supaya hasilnya stabil.
@@ -100,52 +78,11 @@ class DrafHarian
         }
 
         $jadwal = [];
-        foreach ($tanggal as $h => $t) {
-            $jadwal[$t->toDateString()] = $terisi[$h] ?? null;
+        for ($h = 1; $h <= 7; $h++) {
+            $jadwal[$h] = $terisi[$h] ?? null;
         }
 
         return ['jadwal' => $jadwal, 'bisa' => $bisa, 'peringatan' => $peringatan];
-    }
-
-    /**
-     * Menyusun ulang draf: penugasan harian berstatus Terjadwal di minggu ini diganti dengan saran baru.
-     *
-     * @return list<string> peringatan
-     */
-    public function simpan(MingguPiket $minggu): array
-    {
-        $this->jadwal->pastikanDraf($minggu, 'harian');
-        $hasil = $this->susun($minggu);
-
-        DB::transaction(function () use ($minggu, $hasil) {
-            $minggu->penugasan()
-                ->where('jenis', JenisPenugasan::Harian->value)
-                ->where('status', StatusPenugasan::Terjadwal->value)
-                ->delete();
-
-            $terkunci = Penugasan::query()->where('jenis', 'harian')
-                ->whereIn(DB::raw('date(tanggal)'), array_keys($hasil['jadwal']))
-                ->get()->map(fn (Penugasan $p) => $p->tanggalLokal()->toDateString())->all();
-
-            foreach ($hasil['jadwal'] as $tgl => $userId) {
-                if ($userId === null || in_array($tgl, $terkunci, true)) {
-                    continue;
-                }
-                $t = CarbonImmutable::parse($tgl, config('app.timezone'));
-                Penugasan::create([
-                    'minggu_piket_id' => $minggu->id,
-                    'user_id' => $userId,
-                    'jenis' => JenisPenugasan::Harian,
-                    'tanggal' => $tgl,
-                    'tenggat' => Tenggat::untuk(JenisPenugasan::Harian, $t),
-                    'status' => StatusPenugasan::Terjadwal,
-                ]);
-            }
-        });
-
-        LogAktivitas::catat('jadwal.draf_harian', $minggu, ['peringatan' => $hasil['peringatan']]);
-
-        return $hasil['peringatan'];
     }
 
     /**
@@ -178,13 +115,13 @@ class DrafHarian
         return $hasil;
     }
 
-    /** @return array<int, int> user_id => hari ISO giliran harian terakhir sebelum minggu ini */
-    private function hariGiliranSebelumnya(Collection $kandidat, CarbonImmutable $senin): array
+    /** @return array<int, int> user_id => hari ISO giliran harian terakhir sebelum hari ini */
+    private function hariGiliranSebelumnya(Collection $kandidat): array
     {
         return Penugasan::query()
             ->where('jenis', JenisPenugasan::Harian->value)
             ->whereIn('user_id', $kandidat->pluck('id'))
-            ->whereDate('tanggal', '<', $senin->toDateString())
+            ->whereDate('tanggal', '<', now()->toDateString())
             ->orderBy('tanggal')
             ->get()
             ->mapWithKeys(fn (Penugasan $p) => [$p->user_id => $p->tanggalLokal()->dayOfWeekIso])

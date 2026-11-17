@@ -297,6 +297,7 @@ button:disabled {
 .badge-selesai { background: #DCFCE7; color: #166534; }
 .badge-bintang { background: #FEE2E2; color: #991B1B; }
 .badge-lunas { background: #CCFBF1; color: #115E59; }
+.badge-izin { background: #E5E7EB; color: #374151; }
 .badge-pengajuan-menunggu { background: #FEF3C7; color: #92400E; }
 .badge-pengajuan-diterima { background: #DCFCE7; color: #166534; }
 .badge-pengajuan-ditolak { background: #FEE2E2; color: #991B1B; }
@@ -308,6 +309,7 @@ button:disabled {
 .latar-panel .badge-selesai, .gelap .badge-selesai { background: rgba(34, 197, 94, .18); color: #86EFAC; }
 .latar-panel .badge-bintang, .gelap .badge-bintang { background: rgba(239, 68, 68, .2); color: #FCA5A5; }
 .latar-panel .badge-lunas, .gelap .badge-lunas { background: rgba(45, 212, 191, .18); color: #5EEAD4; }
+.latar-panel .badge-izin, .gelap .badge-izin { background: rgba(255, 255, 255, .12); color: #CBD5E1; }
 .latar-panel .badge-pengajuan-menunggu, .gelap .badge-pengajuan-menunggu { background: rgba(250, 204, 21, .16); color: #FDE68A; }
 .latar-panel .badge-pengajuan-diterima, .gelap .badge-pengajuan-diterima { background: rgba(34, 197, 94, .18); color: #86EFAC; }
 .latar-panel .badge-pengajuan-ditolak, .gelap .badge-pengajuan-ditolak { background: rgba(239, 68, 68, .2); color: #FCA5A5; }

@@ -27,6 +27,7 @@ class UserFactory extends Factory
             'aktif' => true,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'harus_ganti_password' => false,
             'remember_token' => Str::random(10),
         ];
     }
@@ -46,9 +47,15 @@ class UserFactory extends Factory
         return $this->state(fn () => ['aktif' => false]);
     }
 
-    /** Akun baru yang belum membuat password (belum bisa login). */
+    /** Akun yang belum punya password sama sekali (belum bisa login). */
     public function tanpaPassword(): static
     {
-        return $this->state(fn () => ['password' => null, 'email_verified_at' => null]);
+        return $this->state(fn () => ['password' => null, 'email_verified_at' => null, 'harus_ganti_password' => true]);
+    }
+
+    /** Akun dengan password awal dari pengurus yang belum diganti (R2). */
+    public function harusGantiPassword(): static
+    {
+        return $this->state(fn () => ['harus_ganti_password' => true]);
     }
 }

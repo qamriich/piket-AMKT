@@ -60,13 +60,17 @@
             </label>
 
             @if ($baru)
-                <label class="flex cursor-pointer items-start gap-3 rounded-2xl bg-white/[.05] p-3.5">
-                    <input type="checkbox" wire:model="kirim_email" class="mt-1 h-5 w-5 flex-none accent-[#84B3CE]">
-                    <span>
-                        <span class="font-bold">Kirim email "Buat password" sekarang</span>
-                        <span class="block text-sm text-rock-muda">Warga membuat password sendiri lewat link di email (berlaku 7 hari), lalu bisa login.</span>
-                    </span>
-                </label>
+                <div class="rounded-2xl bg-white/[.05] p-3.5">
+                    <label for="password_awal" class="label-gelap">Password awal</label>
+                    <div class="flex gap-2">
+                        <input id="password_awal" type="text" wire:model="password_awal" autocomplete="off" class="isian-gelap font-mono tracking-wider" placeholder="minimal 8 karakter">
+                        <button type="button" wire:click="passwordAcak" class="tombol-kaca flex-none !min-h-[48px] text-sm">
+                            <x-ikon nama="acak" :ukuran="16" /> Acak
+                        </button>
+                    </div>
+                    @error('password_awal') <p class="galat-gelap">{{ $message }}</p> @enderror
+                    <p class="mt-1.5 text-[13px] leading-normal text-rock-muda">Sampaikan password ini langsung ke warga. Saat login pertama, ia wajib menggantinya dengan password sendiri.</p>
+                </div>
             @endif
 
             <div class="flex flex-wrap gap-2 pt-1">

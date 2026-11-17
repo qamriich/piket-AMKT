@@ -4,7 +4,7 @@
     $jumlahPengajuan = \App\Models\PengajuanGantiBintang::query()->where('status', 'menunggu')->count();
     $menu = [
         ['pengurus.pengawasan', 'pengurus.pengawasan', 'Pengawasan', 'mata', null],
-        ['pengurus.jadwal', 'pengurus.jadwal', 'Atur jadwal', 'kalender', null],
+        ['pengurus.jadwal', 'pengurus.jadwal|pengurus.jadwal-harian', 'Atur jadwal', 'kalender', null],
         ['pengurus.pengajuan', 'pengurus.pengajuan', 'Pengajuan', 'kotak-masuk', $jumlahPengajuan ?: null],
         ['pengurus.warga.index', 'pengurus.warga.*', 'Warga & geng', 'pengguna', null],
         ['pengurus.rekap', 'pengurus.rekap', 'Rekap bulanan', 'grafik', null],

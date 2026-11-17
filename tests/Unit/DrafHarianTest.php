@@ -12,19 +12,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Aturan B2: saran pembagian hari piket harian.
+ * Aturan B2: saran pembagian hari piket harian, dipakai untuk draf jadwal harian periode per geng (R1).
  */
 class DrafHarianTest extends TestCase
 {
     use RefreshDatabase;
 
-    private MingguPiket $minggu;
-
     protected function setUp(): void
     {
         parent::setUp();
         $this->buatGeng();
-        $this->minggu = MingguPiket::create(['tanggal_senin' => '2026-11-16', 'geng_harian_id' => $this->geng(1)->id]);
+        $this->travelTo(now()->setDate(2026, 11, 18));
     }
 
     private function warga(string $nama, int $geng = 1): User
@@ -40,11 +38,16 @@ class DrafHarianTest extends TestCase
         }
     }
 
+    private function susun(): array
+    {
+        return app(DrafHarian::class)->susunUntukGeng($this->geng(1));
+    }
+
     private function hariDari(array $jadwal, User $u): ?int
     {
-        $tgl = array_search($u->id, $jadwal, true);
+        $hari = array_search($u->id, $jadwal, true);
 
-        return $tgl === false ? null : \Carbon\CarbonImmutable::parse($tgl)->dayOfWeekIso;
+        return $hari === false ? null : $hari;
     }
 
     public function test_tidak_pernah_menaruh_warga_di_hari_kuliah_sebelum_batas(): void
@@ -56,12 +59,12 @@ class DrafHarianTest extends TestCase
             $this->kuliah($orang[$i], collect(range(1, 7))->reject(fn ($h) => $h === $i)->mapWithKeys(fn ($h) => [$h => '08:00'])->all());
         }
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
+        $hasil = $this->susun();
 
         foreach ($orang as $i => $u) {
             $this->assertSame($i, $this->hariDari($hasil['jadwal'], $u), "{$u->nama} harus di hari {$i}");
         }
-        $this->assertNull($hasil['jadwal']['2026-11-22'], 'Hari Minggu kosong');
+        $this->assertNull($hasil['jadwal'][7], 'Hari Minggu kosong');
         $this->assertSame([], $hasil['peringatan']);
     }
 
@@ -76,29 +79,31 @@ class DrafHarianTest extends TestCase
         $this->assertSame(range(1, 7), app(DrafHarian::class)->hariBisa(collect([$u]))[$u->id]);
     }
 
-    public function test_maksimal_satu_hari_per_orang_dan_sisa_hari_kosong(): void
+    public function test_hanya_anggota_aktif_geng_itu_maksimal_satu_hari_per_orang_dan_sisa_kosong(): void
     {
         foreach (['A', 'B', 'C'] as $n) {
             $this->warga($n);
         }
-        $this->warga('Geng lain', 2);
+        $lain = $this->warga('Geng lain', 2);
+        $nonaktif = User::factory()->nonaktif()->create(['geng_id' => $this->geng(1)->id]);
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
+        $hasil = $this->susun();
 
         $terisi = array_filter($hasil['jadwal']);
         $this->assertCount(3, $terisi);
         $this->assertSame(3, count(array_unique($terisi)));
         $this->assertCount(7, $hasil['jadwal']);
+        $this->assertNotContains($lain->id, $terisi);
+        $this->assertNotContains($nonaktif->id, $terisi);
     }
 
     public function test_yang_paling_sedikit_hari_bisa_diisi_lebih_dulu(): void
     {
-        // Leluasa bisa semua hari, Sempit hanya bisa Senin. Leluasa dibuat lebih dulu (id lebih kecil).
         $leluasa = $this->warga('Leluasa');
         $sempit = $this->warga('Sempit');
         $this->kuliah($sempit, [2 => '07:30', 3 => '07:30', 4 => '07:30', 5 => '07:30', 6 => '07:30', 7 => '07:30']);
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
+        $hasil = $this->susun();
 
         $this->assertSame(1, $this->hariDari($hasil['jadwal'], $sempit));
         $this->assertNotSame(1, $this->hariDari($hasil['jadwal'], $leluasa));
@@ -113,9 +118,7 @@ class DrafHarianTest extends TestCase
             'tanggal' => '2026-10-26', 'tenggat' => '2026-10-26 09:00:00', 'status' => 'selesai',
         ]); // giliran sebelumnya hari Senin
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
-
-        $this->assertNotSame(1, $this->hariDari($hasil['jadwal'], $u));
+        $this->assertNotSame(1, $this->hariDari($this->susun()['jadwal'], $u));
     }
 
     public function test_peringatan_untuk_warga_yang_tidak_bisa_di_hari_mana_pun(): void
@@ -123,7 +126,7 @@ class DrafHarianTest extends TestCase
         $u = $this->warga('Pagi Terus');
         $this->kuliah($u, array_fill_keys(range(1, 7), '07:00'));
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
+        $hasil = $this->susun();
 
         $this->assertNull($this->hariDari($hasil['jadwal'], $u));
         $this->assertCount(1, $hasil['peringatan']);
@@ -136,29 +139,9 @@ class DrafHarianTest extends TestCase
             $this->warga("W{$i}");
         }
 
-        $hasil = app(DrafHarian::class)->susun($this->minggu);
+        $hasil = $this->susun();
 
         $this->assertCount(7, array_filter($hasil['jadwal']));
         $this->assertCount(2, $hasil['peringatan']);
-    }
-
-    public function test_simpan_membuat_penugasan_tenggat_jam_9_dan_tidak_menimpa_bayar_bintang(): void
-    {
-        $a = $this->warga('A');
-        $bayar = $this->warga('Pembayar', 2);
-        Penugasan::create([
-            'minggu_piket_id' => $this->minggu->id, 'user_id' => $bayar->id, 'jenis' => 'harian',
-            'tanggal' => '2026-11-16', 'tenggat' => '2026-11-16 09:00:00', 'status' => 'bayar_bintang',
-        ]);
-
-        app(DrafHarian::class)->simpan($this->minggu);
-        app(DrafHarian::class)->simpan($this->minggu); // menyusun ulang tidak menggandakan
-
-        $baris = $this->minggu->penugasan()->where('user_id', $a->id)->get();
-        $this->assertCount(1, $baris);
-        $this->assertNotSame('2026-11-16', $baris[0]->tanggal->toDateString());
-        $this->assertSame('09:00', $baris[0]->tenggat->format('H:i'));
-        $this->assertSame($baris[0]->tanggal->toDateString(), $baris[0]->tenggat->toDateString());
-        $this->assertSame('bayar_bintang', Penugasan::query()->where('user_id', $bayar->id)->first()->status->value);
     }
 }

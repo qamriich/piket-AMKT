@@ -3,10 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Enums\Role;
+use App\Livewire\Pengurus\WargaForm;
 use App\Models\Geng;
 use App\Models\LogAktivitas;
 use App\Models\User;
-use App\Services\AkunPassword;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 
@@ -23,11 +23,11 @@ class CreateAdmin extends Command
         {--email= : Email}
         {--kamar= : Nomor kamar}
         {--geng= : Urutan geng (1-3)}
-        {--kirim : Kirim email "Buat password" (lewat antrean)}';
+        {--password= : Password awal (kalau kosong, dibuat acak)}';
 
-    protected $description = 'Membuat akun pengurus Tata Tertib dan menampilkan link untuk membuat password';
+    protected $description = 'Membuat akun pengurus Tata Tertib dengan password awal yang wajib diganti saat login pertama';
 
-    public function handle(AkunPassword $akun): int
+    public function handle(): int
     {
         // Kalau nama dan email sudah diberikan lewat opsi, jangan tanya hal yang opsional.
         $modeTanya = ! $this->option('nama') || ! $this->option('email');
@@ -72,12 +72,20 @@ class CreateAdmin extends Command
             'aktif' => true,
         ]);
 
-        $url = $this->option('kirim') ? $akun->kirimBuatPassword($user) : $akun->linkBuatPassword($user);
+        $password = (string) ($this->option('password') ?: WargaForm::buatPasswordAcak());
+        if (mb_strlen($password) < 8) {
+            $user->delete();
+            $this->error('Password awal minimal 8 karakter.');
+
+            return self::FAILURE;
+        }
+
+        $user->aturPasswordAwal($password);
         LogAktivitas::catat('admin.dibuat_lewat_artisan', $user);
 
         $this->info("Akun Tata Tertib untuk {$user->nama} dibuat.");
-        $this->line("Link buat password: {$url}");
-        $this->warn('Link berlaku 7 hari. Setelah membuat password, login di /login dengan email ini.');
+        $this->line("Password awal: {$password}");
+        $this->warn('Login di /login dengan email ini. Password awal wajib diganti saat login pertama.');
 
         return self::SUCCESS;
     }

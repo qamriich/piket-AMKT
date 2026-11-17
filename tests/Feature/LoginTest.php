@@ -6,9 +6,9 @@ use App\Enums\Role;
 use App\Livewire\Auth\AturPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\LupaPassword;
+use App\Livewire\Warga\Profil;
 use App\Models\User;
 use App\Notifications\TautanPassword;
-use App\Services\AkunPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
@@ -19,7 +19,7 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Login email + password (PRD bagian 2, revisi 17 Nov 2026).
+ * Login email + password (PRD bagian 2) dan password awal yang wajib diganti (bagian 15 R2).
  */
 class LoginTest extends TestCase
 {
@@ -36,6 +36,13 @@ class LoginTest extends TestCase
         return User::factory()->role($role)->create(array_merge(['email' => 'ping@amkt.test'], $data));
     }
 
+    private function cookieIngat(): ?\Symfony\Component\HttpFoundation\Cookie
+    {
+        return collect(Cookie::getQueuedCookies())->first(fn ($c) => str_starts_with($c->getName(), 'remember_web_'));
+    }
+
+    // ---------- Login ----------
+
     public function test_tamu_diarahkan_ke_halaman_login(): void
     {
         $this->get('/')->assertRedirect(route('login'));
@@ -43,10 +50,11 @@ class LoginTest extends TestCase
         $this->get(route('login'))->assertOk()->assertSee('Masuk ke')->assertSee('Ingat saya')->assertSee('Lupa password?');
     }
 
-    public function test_route_link_pribadi_dan_pin_sudah_dihapus(): void
+    public function test_link_pribadi_pin_dan_email_buat_password_sudah_dihapus(): void
     {
         $this->get('/m/'.str_repeat('a', 64))->assertNotFound();
         $this->get('/pin')->assertNotFound();
+        $this->get('/password/buat/abc')->assertNotFound();
         $this->assertFalse(Schema::hasColumns('users', ['token_hash']));
         $this->assertFalse(Schema::hasColumns('users', ['pin_hash']));
     }
@@ -56,8 +64,7 @@ class LoginTest extends TestCase
         $this->akun();
 
         Livewire::test(Login::class)
-            ->set('email', ' Ping@AMKT.test ')
-            ->set('password', 'password')
+            ->set('email', ' Ping@AMKT.test ')->set('password', 'password')
             ->call('masuk')
             ->assertHasNoErrors()
             ->assertRedirect(route('dashboard'));
@@ -103,7 +110,6 @@ class LoginTest extends TestCase
             Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'salah')->call('masuk');
         }
 
-        // Percobaan ke-6 ditolak walau password benar.
         Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'password')
             ->call('masuk')->assertHasErrors('email')->assertSee('Terlalu banyak percobaan');
         $this->assertGuest();
@@ -121,11 +127,10 @@ class LoginTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_akun_yang_belum_membuat_password_tidak_bisa_login(): void
+    public function test_akun_tanpa_password_tidak_bisa_login(): void
     {
         User::factory()->tanpaPassword()->create(['email' => 'ping@amkt.test']);
 
-        Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', '')->call('masuk')->assertHasErrors('password');
         Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'apa saja')->call('masuk')->assertHasErrors('email');
         $this->assertGuest();
     }
@@ -136,11 +141,8 @@ class LoginTest extends TestCase
 
         Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'password')->set('ingat', true)->call('masuk');
 
-        $cookie = collect(Cookie::getQueuedCookies())
-            ->first(fn ($c) => str_starts_with($c->getName(), 'remember_web_'));
-        $this->assertNotNull($cookie, 'Cookie "ingat saya" harus dibuat.');
-        $this->assertEqualsWithDelta(now()->addDays(30)->getTimestamp(), $cookie->getExpiresTime(), 120);
-        $this->assertNotNull(auth()->user()->fresh()->remember_token);
+        $this->assertNotNull($this->cookieIngat(), 'Cookie "ingat saya" harus dibuat.');
+        $this->assertEqualsWithDelta(now()->addDays(30)->getTimestamp(), $this->cookieIngat()->getExpiresTime(), 120);
     }
 
     public function test_tanpa_ingat_saya_tidak_ada_cookie_panjang(): void
@@ -149,8 +151,7 @@ class LoginTest extends TestCase
 
         Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'password')->call('masuk');
 
-        $this->assertNull(collect(Cookie::getQueuedCookies())
-            ->first(fn ($c) => str_starts_with($c->getName(), 'remember_web_')));
+        $this->assertNull($this->cookieIngat());
     }
 
     public function test_warga_yang_dinonaktifkan_langsung_keluar(): void
@@ -172,124 +173,143 @@ class LoginTest extends TestCase
         $this->assertGuest();
     }
 
+    // ---------- R2: password awal wajib diganti ----------
+
+    public function test_login_dengan_password_awal_diarahkan_ke_buat_password_baru(): void
+    {
+        $this->akun(data: ['harus_ganti_password' => true]);
+
+        Livewire::test(Login::class)->set('email', 'ping@amkt.test')->set('password', 'password')
+            ->call('masuk')->assertRedirect(route('password.baru'));
+    }
+
+    public function test_selama_belum_ganti_semua_halaman_diarahkan_ke_buat_password_baru(): void
+    {
+        $this->actingAs($this->akun(Role::TataTertib, ['harus_ganti_password' => true]));
+
+        foreach (['dashboard', 'warga.piket', 'warga.profil', 'pengurus.pengawasan', 'pengurus.warga.index'] as $rute) {
+            $this->get(route($rute))->assertRedirect(route('password.baru'));
+        }
+        $this->get('/')->assertRedirect(route('password.baru'));
+        $this->get(route('password.baru'))->assertOk()->assertSee('Buat password baru');
+
+        // Aksi Livewire (tanpa reload) juga diblokir.
+        $this->withHeader('X-Livewire', 'true')->post('/livewire/update', [])->assertForbidden();
+
+        // Keluar tetap boleh.
+        $this->post(route('keluar'))->assertRedirect(route('login'));
+    }
+
+    public function test_password_baru_minimal_8_dan_tidak_boleh_sama_dengan_password_awal(): void
+    {
+        $user = $this->akun(data: ['harus_ganti_password' => true]);
+        $this->actingAs($user);
+
+        $this->post(route('password.baru.simpan'), ['password' => 'pendek', 'password_confirmation' => 'pendek'])->assertSessionHasErrors('password');
+        $this->post(route('password.baru.simpan'), ['password' => 'rahasia123', 'password_confirmation' => 'beda12345'])->assertSessionHasErrors('password');
+        $this->post(route('password.baru.simpan'), ['password' => 'password', 'password_confirmation' => 'password'])
+            ->assertSessionHasErrors(['password' => 'Password baru tidak boleh sama dengan password awal.']);
+        $this->assertTrue($user->fresh()->harus_ganti_password);
+
+        $this->post(route('password.baru.simpan'), ['password' => 'rahasia123', 'password_confirmation' => 'rahasia123'])
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertFalse($user->harus_ganti_password);
+        $this->assertTrue(Hash::check('rahasia123', $user->password));
+        $this->get(route('dashboard'))->assertOk();
+        $this->get(route('password.baru'))->assertRedirect(route('dashboard'));
+    }
+
+    public function test_pengurus_setelah_ganti_password_masuk_ke_panel(): void
+    {
+        $this->actingAs($this->akun(Role::Ketua, ['harus_ganti_password' => true]));
+
+        $this->post(route('password.baru.simpan'), ['password' => 'rahasia123', 'password_confirmation' => 'rahasia123'])
+            ->assertRedirect(route('pengurus.pengawasan'));
+    }
+
+    public function test_ganti_password_di_profil(): void
+    {
+        $user = $this->akun();
+        $this->actingAs($user);
+        $this->get(route('warga.profil'))->assertSee('Ganti password');
+
+        Livewire::test(Profil::class)
+            ->set('password_lama', 'salah')->set('password_baru', 'rahasia123')->set('password_baru_confirmation', 'rahasia123')
+            ->call('gantiPassword')->assertHasErrors(['password_lama' => 'current_password']);
+
+        Livewire::test(Profil::class)
+            ->set('password_lama', 'password')->set('password_baru', 'password')->set('password_baru_confirmation', 'password')
+            ->call('gantiPassword')->assertHasErrors('password_baru');
+
+        Livewire::test(Profil::class)
+            ->set('password_lama', 'password')->set('password_baru', 'rahasia123')->set('password_baru_confirmation', 'rahasia123')
+            ->call('gantiPassword')->assertHasNoErrors()->assertDispatched('toast')->assertSet('password_lama', '');
+
+        $this->assertTrue(Hash::check('rahasia123', $user->fresh()->password));
+    }
+
+    // ---------- Lupa password (email) ----------
+
     public function test_lupa_password_mengirim_email_reset_tanpa_membocorkan_email_terdaftar(): void
     {
         Notification::fake();
         $user = $this->akun();
 
         Livewire::test(LupaPassword::class)->set('email', 'ping@amkt.test')->call('kirim')->assertSet('terkirim', true);
-        Notification::assertSentTo($user, TautanPassword::class, fn (TautanPassword $n) => $n->jenis === TautanPassword::RESET
-            && str_contains($n->url($user), '/password/reset/'));
+        Notification::assertSentTo($user, TautanPassword::class, fn (TautanPassword $n) => str_contains($n->url($user), '/password/reset/'));
 
-        // Email tidak terdaftar: jawabannya sama, tidak ada email terkirim.
         Livewire::test(LupaPassword::class)->set('email', 'tidakada@amkt.test')->call('kirim')->assertSet('terkirim', true);
         Notification::assertSentTimes(TautanPassword::class, 1);
     }
 
-    public function test_reset_password_lalu_langsung_masuk_sesuai_role(): void
+    public function test_reset_lewat_email_mematikan_wajib_ganti_lalu_masuk_sesuai_role(): void
     {
-        $user = $this->akun(Role::TataTertib);
+        $user = $this->akun(Role::TataTertib, ['harus_ganti_password' => true]);
         $token = Password::broker()->createToken($user);
 
         $this->get(route('password.reset', ['token' => $token, 'email' => 'ping@amkt.test']))->assertOk()->assertSee('Buat password baru');
 
         Livewire::withQueryParams(['email' => 'ping@amkt.test'])
             ->test(AturPassword::class, ['token' => $token])
-            ->set('password', 'rahasia-baru')
-            ->set('password_confirmation', 'rahasia-baru')
+            ->set('password', 'rahasia-baru')->set('password_confirmation', 'rahasia-baru')
             ->call('simpan')
             ->assertHasNoErrors()
             ->assertRedirect(route('pengurus.pengawasan'));
 
-        $this->assertTrue(Hash::check('rahasia-baru', $user->fresh()->password));
-        $this->assertAuthenticatedAs($user);
-    }
-
-    public function test_link_buat_password_dari_email_masih_bisa_dipakai_di_hari_ke_6(): void
-    {
-        Notification::fake();
-        $user = User::factory()->tanpaPassword()->create(['email' => 'ping@amkt.test']);
-        app(AkunPassword::class)->kirimBuatPassword($user);
-
-        $token = null;
-        Notification::assertSentTo($user, TautanPassword::class, function (TautanPassword $n) use (&$token) {
-            $token = $n->token;
-
-            return $n->jenis === TautanPassword::BUAT;
-        });
-
-        // Link reset biasa (60 menit) sudah lewat, tapi link buat password masih berlaku.
-        $this->travel(6)->days();
-        Livewire::withQueryParams(['email' => 'ping@amkt.test'])
-            ->test(AturPassword::class, ['token' => $token, 'jenis' => 'buat'])
-            ->assertSet('jenis', 'buat')
-            ->set('password', 'rahasia123')->set('password_confirmation', 'rahasia123')
-            ->call('simpan')
-            ->assertHasNoErrors()
-            ->assertRedirect(route('dashboard'));
-
         $user->refresh();
-        $this->assertTrue(Hash::check('rahasia123', $user->password));
-        $this->assertNotNull($user->email_verified_at);
+        $this->assertTrue(Hash::check('rahasia-baru', $user->password));
+        $this->assertFalse($user->harus_ganti_password);
         $this->assertAuthenticatedAs($user);
     }
 
-    public function test_halaman_buat_password_lewat_route_dan_kedaluwarsa_setelah_7_hari(): void
+    public function test_link_reset_kedaluwarsa_setelah_60_menit_dan_token_salah_ditolak(): void
     {
-        $user = User::factory()->tanpaPassword()->create(['email' => 'ping@amkt.test']);
-        $url = app(AkunPassword::class)->linkBuatPassword($user);
-        $this->assertStringContainsString('/password/buat/', $url);
+        $user = $this->akun();
+        $token = Password::broker()->createToken($user);
 
-        $this->get($url)->assertOk()->assertSee('Buat password');
-
-        // Hari ke-6: masih berlaku.
-        $this->travel(6)->days();
-        $this->assertTrue(Password::broker('buat')->tokenExists($user, basename(parse_url($url, PHP_URL_PATH))));
-        $this->assertFalse(Password::broker('users')->tokenExists($user, basename(parse_url($url, PHP_URL_PATH))));
-
-        // Hari ke-8: kedaluwarsa.
-        $this->travel(2)->days();
-        $this->assertFalse(Password::broker('buat')->tokenExists($user, basename(parse_url($url, PHP_URL_PATH))));
-    }
-
-    public function test_ulangi_password_harus_sama(): void
-    {
-        $user = User::factory()->tanpaPassword()->create(['email' => 'ping@amkt.test']);
-        $url = app(AkunPassword::class)->linkBuatPassword($user);
-        $token = basename(parse_url($url, PHP_URL_PATH));
-
-        $this->get($url)->assertOk();
+        $this->travel(61)->minutes();
         Livewire::withQueryParams(['email' => 'ping@amkt.test'])
-            ->test(AturPassword::class, ['token' => $token, 'jenis' => 'buat'])
-            ->set('password', 'rahasia123')
-            ->set('password_confirmation', 'beda')
-            ->call('simpan')
-            ->assertHasErrors('password');
-
-        $this->assertFalse($user->fresh()->punyaPassword());
-    }
-
-    public function test_token_salah_ditolak(): void
-    {
-        $this->akun();
+            ->test(AturPassword::class, ['token' => $token])
+            ->set('password', 'rahasia123')->set('password_confirmation', 'rahasia123')
+            ->call('simpan')->assertHasErrors('email');
 
         Livewire::withQueryParams(['email' => 'ping@amkt.test'])
             ->test(AturPassword::class, ['token' => 'token-palsu'])
             ->set('password', 'rahasia123')->set('password_confirmation', 'rahasia123')
-            ->call('simpan')
-            ->assertHasErrors('email');
+            ->call('simpan')->assertHasErrors('email');
         $this->assertGuest();
     }
 
-    public function test_email_buat_password_berbahasa_indonesia(): void
+    public function test_email_reset_berbahasa_indonesia(): void
     {
-        $user = User::factory()->tanpaPassword()->create(['nama' => 'Ping', 'email' => 'ping@amkt.test']);
-        $pesan = (new TautanPassword('abc', TautanPassword::BUAT))->toMail($user);
+        $user = User::factory()->create(['nama' => 'Ping', 'email' => 'ping@amkt.test']);
+        $pesan = (new TautanPassword('abc'))->toMail($user);
 
-        $this->assertSame('Buat password untuk web piket AMKT Putri', $pesan->subject);
+        $this->assertSame('Reset password web piket AMKT Putri', $pesan->subject);
         $this->assertSame('Halo, Ping', $pesan->greeting);
-        $this->assertSame('Buat password', $pesan->actionText);
-        $this->assertStringContainsString('/password/buat/abc?email=ping%40amkt.test', $pesan->actionUrl);
-        $this->assertStringContainsString('7 hari', implode(' ', $pesan->outroLines));
+        $this->assertStringContainsString('/password/reset/abc?email=ping%40amkt.test', $pesan->actionUrl);
+        $this->assertStringContainsString('60 menit', implode(' ', $pesan->outroLines));
     }
 }

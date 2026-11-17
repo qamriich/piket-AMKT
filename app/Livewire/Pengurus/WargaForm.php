@@ -8,7 +8,6 @@ use App\Livewire\Concerns\KhususPengurus;
 use App\Models\Geng;
 use App\Models\LogAktivitas;
 use App\Models\User;
-use App\Services\AkunPassword;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -37,7 +36,8 @@ class WargaForm extends Component
 
     public bool $wajib_diperiksa = false;
 
-    public bool $kirim_email = true;
+    /** Password awal (hanya saat membuat akun). Warga wajib menggantinya saat login pertama (R2). */
+    public string $password_awal = '';
 
     public function mount(?User $warga = null): void
     {
@@ -57,7 +57,28 @@ class WargaForm extends Component
         return $this->wargaId ? User::query()->findOrFail($this->wargaId) : null;
     }
 
-    public function simpan(AkunPassword $akun)
+    /** Isi password awal acak yang mudah dibacakan (tanpa huruf yang mirip seperti l/1 dan O/0). */
+    public function passwordAcak(): void
+    {
+        $this->password_awal = self::buatPasswordAcak();
+    }
+
+    public static function buatPasswordAcak(): string
+    {
+        $huruf = 'abcdefghjkmnpqrstuvwxyz';
+        $angka = '23456789';
+        $hasil = '';
+        for ($i = 0; $i < 6; $i++) {
+            $hasil .= $huruf[random_int(0, strlen($huruf) - 1)];
+        }
+        for ($i = 0; $i < 3; $i++) {
+            $hasil .= $angka[random_int(0, strlen($angka) - 1)];
+        }
+
+        return $hasil;
+    }
+
+    public function simpan()
     {
         $warga = $this->warga();
 
@@ -80,19 +101,18 @@ class WargaForm extends Component
         $data['geng_id'] = (int) $data['geng_id'];
 
         if ($warga === null) {
+            $this->validate(
+                ['password_awal' => ['required', 'string', 'min:8', 'max:100']],
+                ['password_awal.required' => 'Password awal wajib diisi.', 'password_awal.min' => 'Password awal minimal 8 karakter.'],
+            );
+
             $baru = new User($data);
             $baru->aktif = true;
             $baru->save();
+            $baru->aturPasswordAwal($this->password_awal);
             LogAktivitas::catat('warga.dibuat', $baru, $data);
 
-            $pesan = "Akun {$baru->nama} berhasil dibuat.";
-            if ($this->kirim_email) {
-                $akun->kirimBuatPassword($baru);
-                LogAktivitas::catat('warga.email_buat_password', $baru);
-                $pesan .= " Email buat password sedang dikirim ke {$baru->email}.";
-            }
-
-            session()->flash('status', $pesan);
+            session()->flash('status', "Akun {$baru->nama} dibuat. Berikan password awalnya; {$baru->namaDepan()} wajib menggantinya saat login pertama.");
 
             return $this->redirectRoute('pengurus.warga.index', navigate: true);
         }

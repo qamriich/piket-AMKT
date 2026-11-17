@@ -13,7 +13,7 @@ use App\Models\MingguPiket;
 use App\Models\Penugasan;
 use App\Models\Tugas;
 use App\Models\User;
-use App\Services\DrafHarian;
+use App\Services\JadwalHarianPeriode;
 use App\Services\JadwalMinggu;
 use App\Services\PenugasanOtomatis;
 use App\Services\RotasiGeng;
@@ -88,15 +88,7 @@ class AturJadwal extends Component
         $this->tukarDari = null;
     }
 
-    // ---------- Harian (F4, B2) ----------
-
-    public function buatDrafHarian(DrafHarian $draf): void
-    {
-        $this->coba(function () use ($draf) {
-            $this->catatan['harian'] = $draf->simpan($this->minggu());
-            $this->versi++;
-        }, 'Draf harian sudah disusun dari jadwal kuliah.');
-    }
+    // ---------- Harian: otomatis dari jadwal periode (R1); di sini hanya pengganti per tanggal ----------
 
     public function aturHarian(string $tanggal, $userId, JadwalMinggu $jadwal): void
     {
@@ -195,30 +187,27 @@ class AturJadwal extends Component
 
     public function terbitkan(string $bagian, JadwalMinggu $jadwal): void
     {
-        if (! in_array($bagian, ['harian', 'kamis', 'minggu'], true)) {
-            return;
-        }
+        // Hanya Kamis dan Minggu yang diterbitkan (R1); service menolak "harian".
         $label = $bagian === 'harian' ? 'harian' : ucfirst($bagian);
         $this->coba(fn () => $jadwal->terbitkan($this->minggu(), $bagian), "Jadwal {$label} diterbitkan dan sekarang terlihat oleh warga.");
     }
 
-    public function render(JadwalMinggu $jadwal, DrafHarian $draf)
+    public function render(JadwalMinggu $jadwal, JadwalHarianPeriode $jadwalPeriode)
     {
         $minggu = $this->minggu()->load('gengHarian');
         $semua = $minggu->penugasan()->with(['user', 'tugas', 'membayar'])->get();
 
         $anggotaHarian = $jadwal->anggotaHarian($minggu);
         $harian = $semua->where('jenis', JenisPenugasan::Harian)->keyBy(fn (Penugasan $p) => $p->tanggal->toDateString());
-        $bisa = $draf->hariBisa($anggotaHarian);
         $hitungHari = $harian->countBy('user_id');
 
-        $hari = collect(range(0, 6))->map(function (int $i) use ($minggu, $harian, $anggotaHarian, $bisa) {
+        $hari = collect(range(0, 6))->map(function (int $i) use ($minggu, $harian, $jadwalPeriode) {
             $t = $minggu->senin()->addDays($i);
 
             return [
                 'tanggal' => $t,
                 'penugasan' => $harian->get($t->toDateString()),
-                'bisa' => $anggotaHarian->filter(fn (User $u) => in_array($t->dayOfWeekIso, $bisa[$u->id] ?? [], true))->map->namaDepan()->values(),
+                'periode' => $jadwalPeriode->aktifPada($t),
             ];
         });
 
@@ -246,6 +235,8 @@ class AturJadwal extends Component
             'seninIni' => RotasiGeng::seninDari(CarbonImmutable::now()),
             'hari' => $hari,
             'anggotaHarian' => $anggotaHarian,
+            'wargaLain' => User::query()->aktif()->where('geng_id', '!=', $minggu->geng_harian_id)->orderBy('nama')->get(),
+            'periodeMinggu' => $hari->pluck('periode')->filter()->unique('id')->values(),
             'hitungHari' => $hitungHari,
             'harianAda' => $harian->isNotEmpty(),
             'sesi' => $sesi,

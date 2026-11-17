@@ -17,7 +17,7 @@
     </div>
 
     <div class="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-        @foreach ([['Piket terjadwal', 'terjadwal', 'text-white'], ['Selesai', 'selesai', 'text-green-300'], ['Bintang baru', 'bintang_baru', 'text-red-300'], ['Utang belum lunas', 'utang', 'text-amber-200']] as $i => [$label, $k, $warna])
+        @foreach ([['Jumlah piket', 'terjadwal', 'text-white'], ['Selesai', 'selesai', 'text-green-300'], ['Bintang baru', 'bintang_baru', 'text-red-300'], ['Utang belum lunas', 'utang', 'text-amber-200']] as $i => [$label, $k, $warna])
             <div class="kartu-kaca angkat naik t{{ $i + 1 }} flex flex-col gap-1.5 p-5">
                 <span x-data x-hitung data-nilai="{{ $total[$k] }}" class="text-[36px] font-extrabold leading-none {{ $warna }}">{{ $total[$k] }}</span>
                 <span class="text-sm font-semibold text-krem">{{ $label }}</span>
@@ -31,7 +31,7 @@
                 <thead class="text-xs uppercase tracking-[0.06em] text-rock-muda">
                     <tr class="border-b border-white/10">
                         <th class="px-5 py-3.5 font-bold">Warga</th>
-                        <th class="px-3 py-3.5 text-right font-bold">Terjadwal</th>
+                        <th class="px-3 py-3.5 text-right font-bold">Jumlah piket</th>
                         <th class="px-3 py-3.5 text-right font-bold">Selesai</th>
                         <th class="px-3 py-3.5 text-right font-bold">Bintang baru</th>
                         <th class="px-3 py-3.5 text-right font-bold">Lunas</th>

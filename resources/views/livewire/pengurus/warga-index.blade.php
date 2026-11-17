@@ -26,7 +26,7 @@
                 </header>
                 <ul class="m-0 flex list-none flex-col p-0">
                     @forelse ($anggota as $w)
-                        <li wire:key="w-{{ $w->id }}" x-data="{ menu: false }" class="border-t border-white/[.06] px-5 py-3.5 first:border-t-0">
+                        <li wire:key="w-{{ $w->id }}" x-data="{ menu: false, reset: false, pw: '' }" class="border-t border-white/[.06] px-5 py-3.5 first:border-t-0">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
                                     <p @class(['m-0 truncate font-bold', 'text-rock-redup line-through' => ! $w->aktif])>{{ $w->nama }}</p>
@@ -42,7 +42,9 @@
                                             <span class="badge badge-netral">Nonaktif</span>
                                         @endif
                                         @if (! $w->punyaPassword())
-                                            <span class="badge badge-pengajuan-menunggu">Belum buat password</span>
+                                            <span class="badge badge-bintang">Belum ada password</span>
+                                        @elseif ($w->harus_ganti_password)
+                                            <span class="badge badge-pengajuan-menunggu">Belum ganti password awal</span>
                                         @endif
                                     </div>
                                 </div>
@@ -63,12 +65,11 @@
                                 </label>
                                 <div class="flex flex-wrap gap-2">
                                     <a href="{{ route('pengurus.warga.edit', $w) }}" wire:navigate class="tombol-kecil-gelap no-underline"><x-ikon nama="pensil" :ukuran="16" />&nbsp;Ubah</a>
-                                    @if ($w->aktif)
-                                        <button type="button" class="tombol-kecil-gelap"
-                                                @click="$store.konfirmasi.tanya({ judul: @js('Kirim email buat password ke '.$w->nama.'?'), pesan: @js('Email berisi link untuk membuat password (berlaku 7 hari) dikirim ke '.$w->email.'.'.($w->punyaPassword() ? ' Password lamanya tetap berlaku sampai ia membuat yang baru.' : '')), tombol: 'Kirim email', aksi: () => $wire.kirimBuatPassword({{ $w->id }}) })">
-                                            <x-ikon nama="surat" :ukuran="16" />&nbsp;Kirim ulang email buat password
+                                    @unless ($w->is($saya))
+                                        <button type="button" class="tombol-kecil-gelap" @click="reset = !reset; if (reset && !pw) pw = await $wire.passwordAcak()" :aria-expanded="reset">
+                                            <x-ikon nama="kunci" :ukuran="16" />&nbsp;Reset password
                                         </button>
-                                    @endif
+                                    @endunless
                                     @unless ($w->is($saya))
                                         @if ($w->aktif)
                                             <button type="button" class="tekan inline-flex min-h-[44px] items-center rounded-xl bg-red-500/15 px-3.5 text-sm font-extrabold text-red-200"
@@ -80,6 +81,22 @@
                                         @endif
                                     @endunless
                                 </div>
+                                @unless ($w->is($saya))
+                                    <div x-show="reset" x-cloak x-collapse class="flex flex-col gap-2 rounded-xl border border-rock/30 bg-rock/10 p-3">
+                                        <label class="text-xs font-bold text-rock-muda" for="pw-{{ $w->id }}">Password awal baru untuk {{ $w->namaDepan() }}</label>
+                                        <div class="flex gap-2">
+                                            <input id="pw-{{ $w->id }}" type="text" x-model="pw" autocomplete="off" class="isian-gelap !min-h-[44px] font-mono text-sm tracking-wider">
+                                            <button type="button" class="tombol-kaca flex-none !min-h-[44px] !px-3 text-sm" @click="pw = await $wire.passwordAcak()" aria-label="Buat password acak">
+                                                <x-ikon nama="acak" :ukuran="16" />
+                                            </button>
+                                        </div>
+                                        <button type="button" class="tombol-rock !min-h-[44px] text-sm" :disabled="pw.trim().length < 8"
+                                                @click="$store.konfirmasi.tanya({ judul: @js('Reset password '.$w->nama.'?'), pesan: 'Password lamanya langsung tidak berlaku. Sampaikan password awal yang baru; ia wajib menggantinya saat login.', tombol: 'Reset password', bahaya: true, aksi: () => { $wire.resetPassword({{ $w->id }}, pw); reset = false } })">
+                                            Simpan password awal
+                                        </button>
+                                        <span class="text-[12px] text-rock-muda">Minimal 8 karakter.</span>
+                                    </div>
+                                @endunless
                             </div>
                         </li>
                     @empty

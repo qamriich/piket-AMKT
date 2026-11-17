@@ -23,7 +23,7 @@ Aplikasi web berbasis Laravel untuk menyusun, membagikan, dan memantau jadwal pi
 
 **Termasuk dalam lingkup:** manajemen warga dan geng, rotasi geng mingguan, piket Harian, Kamis, dan Minggu (termasuk kerja bakti), toggle tugas, penugasan otomatis, tandai selesai, pemeriksaan, catatan pengurus, bintang otomatis, pengajuan ganti bintang harian, notifikasi email, dan rekap bulanan.
 
-**Tidak termasuk:** pengajuan izin atau berhalangan (diurus langsung oleh pengurus di luar sistem), sanksi selain bintang, aplikasi mobile native, dan pembayaran atau iuran.
+**Tidak termasuk:** sanksi selain bintang, aplikasi mobile native, dan pembayaran atau iuran.
 
 ## 2. Pengguna, peran, dan akses
 
@@ -41,7 +41,7 @@ Pengurus juga anggota geng dan ikut piket, jadi pengurus punya dashboard warga s
 **Mekanisme login (revisi 17 Nov 2026, menggantikan link pribadi dan PIN)**
 
 1. Pengurus menambah warga di halaman Warga & geng: nama, email, kamar, geng, role, dan wajib diperiksa. Tidak ada pendaftaran mandiri.
-2. Saat akun dibuat, sistem mengirim email "Buat password" berisi link yang berlaku 7 hari. Warga membuka link itu dan membuat password sendiri.
+2. Saat membuat akun, pengurus mengisi password awal. Saat login pertama, warga wajib mengganti password sebelum bisa membuka halaman lain. Password bisa diganti kapan saja dari halaman Profil.
 3. Halaman login berisi email, password, dan centang "Ingat saya" (sesi bertahan 30 hari). Ada link "Lupa password" yang mengirim email reset.
 4. Setelah login, role warga diarahkan ke Beranda warga, sedangkan role pengurus (ketua, sekretaris, bendahara, tata_tertib) diarahkan ke panel pengurus (Pengawasan). Pengurus tetap bisa membuka tampilan warga lewat menu "Tampilan warga", dan di tampilan warga milik pengurus ada tombol "Panel pengurus" di header.
 5. Pengurus bisa menekan "Kirim ulang email buat password" untuk warga yang belum pernah login atau lupa.
@@ -156,7 +156,7 @@ Inputnya adalah daftar tugas aktif dan pool petugas. Pool Kamis adalah anggota a
 - Setiap piket dengan status Terjadwal atau Bayar Bintang yang belum selesai saat tenggat lewat akan diubah sistem menjadi **Bintang**.
 - Tenggatnya: Harian jam 09.00 di hari itu, Kamis hari Jumat jam 18.00, dan Minggu hari Senin jam 18.00.
 - Pengecekan berjalan lewat scheduler (lihat bagian 9). Selain itu, ada pengecekan ringan setiap kali halaman dibuka supaya status tetap akurat meskipun scheduler terlambat.
-- Izin atau berhalangan diurus di luar sistem. Kalau pengurus memutuskan seseorang tidak perlu kena bintang, pengurus bisa mengubah statusnya secara manual dan menulis catatan.
+- Izin pulang diatur lewat fitur Izin pulang (bagian 15). Pengurus juga bisa mengoreksi status setelah tenggat, misalnya Bintang menjadi Selesai kalau piket sebenarnya sudah dikerjakan, dengan catatan wajib.
 
 **B5. Pelunasan bintang**
 
@@ -344,3 +344,41 @@ Nama panggilan saja. Email sementara `<nama>@amkt.test`, diganti pengurus dari h
 - HP (< 768 px): layout satu kolom seperti desain-warga.html, dengan 5 tab ikon di bawah header.
 - Laptop (≥ 1024 px): web warga menjadi dashboard lebar. Navbar atas berisi logo, 5 menu teks dengan ikon, dan avatar. Konten maksimal 1200 px di tengah. Bagian atas Beranda dibagi 2 kolom (sapaan di kiri, kartu bento di kanan), kartu "Yang perlu kamu tahu" disusun 2 kolom, dan jadwal tampil sebagai tabel lebar.
 - Panel pengurus memakai sidebar di laptop dan menu bawah di HP, seperti desain-pengurus.html.
+
+## 15. Revisi 17 Nov 2026 (sore): jadwal harian per periode, izin pulang, password awal
+
+Bagian ini menggantikan aturan lama di bagian 3, 4, dan 5 kalau bertentangan.
+
+**R1. Jadwal harian per periode, bukan per minggu**
+
+- Tata Tertib membuat **jadwal harian periode** (misalnya "Semester Ganjil 2026/2027", dengan tanggal mulai dan selesai). Isinya: untuk tiap geng, tiap anggota punya satu hari tetap (Senin–Minggu), dan hari tanpa anggota menjadi kosong.
+- Draf hari dibuat dari jadwal kuliah (aturan B2), lalu diubah dan disimpan pengurus satu kali per periode.
+- Setiap minggu, sistem otomatis membuat penugasan harian dari jadwal periode untuk geng yang sedang bertugas. **Tidak ada tombol Terbitkan untuk harian.**
+- Kalau anggota geng berubah di tengah periode, pengurus cukup mengubah jadwal periode, dan perubahannya berlaku mulai minggu berikutnya.
+- Yang diterbitkan tiap minggu hanya **piket Kamis dan piket Minggu**.
+
+**R2. Password awal dan wajib ganti**
+
+- Kolom tambahan di `users`: `harus_ganti_password` (bool, default true).
+- Selama `harus_ganti_password` = true, semua halaman mengarah ke halaman "Buat password baru". Password baru minimal 8 karakter dan tidak boleh sama dengan password awal.
+- Ada menu Ganti password di Profil dan "Lupa password" di halaman login (lewat email).
+- Pengurus bisa menekan "Reset password" di Warga & geng, yang mengembalikan akun ke password awal baru dan mengaktifkan lagi `harus_ganti_password`.
+
+**R3. Izin pulang**
+
+- Tabel baru `izin`: id, user_id, tanggal_mulai, tanggal_selesai, alasan (opsional), status (menunggu / disetujui / ditolak), dibuat_oleh_id, diputuskan_oleh_id.
+- Pengurus bisa langsung membuat izin (langsung disetujui). Warga bisa mengajukan izin dari halaman Piket saya, lalu pengurus menyetujui atau menolak, dan warga mendapat email.
+- Selama izin disetujui, warga tidak masuk pool pembagian Kamis dan Minggu yang tanggal piketnya jatuh di rentang izin. Bintang lama miliknya juga ditunda.
+- Kalau warga sudah dapat piket yang sudah terbit lalu izinnya disetujui, piket itu berstatus **Izin** (abu-abu, tidak menjadi bintang). Sistem otomatis memilih **pengganti** dengan aturan yang sama seperti B3 langkah 2: warga di pool yang sedang di asrama, belum punya tugas reguler di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Pengganti mendapat email. Kalau tidak ada calon, tugas ditandai "Belum ada petugas" untuk diisi pengurus.
+- Untuk piket harian, hari milik warga yang izin menjadi kosong. Pengurus bisa memilih pengganti secara manual.
+- Panel Pengawasan menampilkan daftar siapa yang sedang pulang minggu ini.
+
+**R4. Label status**
+
+- Status `terjadwal` ditampilkan ke pengguna sebagai **"Belum dikerjakan"**.
+- Status baru **Izin** (abu-abu) untuk piket yang dilepas karena izin pulang.
+- Status jadwal (Draf/Terbit) hanya ditampilkan di halaman Atur jadwal, bukan di tiap piket.
+
+**R5. Koreksi oleh pengurus**
+
+Pengurus bisa mengubah status piket mana pun setelah tenggat (misalnya Bintang menjadi Selesai), dengan catatan wajib. Perubahannya dicatat di log aktivitas.
