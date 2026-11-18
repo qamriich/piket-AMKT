@@ -342,6 +342,38 @@ class JadwalMinggu
         }
     }
 
+    /**
+     * R3: tugas Kamis/Minggu yang sudah terbit dan batasnya belum lewat, tetapi belum ada petugasnya
+     * (misalnya tidak ada calon pengganti untuk warga yang izin). Ditampilkan paling atas di Pengawasan.
+     *
+     * @return Collection<int, array{minggu: MingguPiket, sesi: SesiTugas, tugas: Tugas, tanggal: CarbonImmutable}>
+     */
+    public function tanpaPetugas(MingguPiket $minggu, ?CarbonImmutable $sekarang = null): Collection
+    {
+        $sekarang ??= CarbonImmutable::now();
+        $hasil = collect();
+
+        foreach (SesiTugas::cases() as $sesi) {
+            if (! $minggu->sudahTerbit($sesi) || ($sesi === SesiTugas::Minggu && $minggu->kerjaBakti())) {
+                continue;
+            }
+            $jenis = $sesi === SesiTugas::Kamis ? JenisPenugasan::Kamis : JenisPenugasan::Minggu;
+            $tanggal = $sesi === SesiTugas::Kamis ? $minggu->kamis() : $minggu->hariMinggu();
+            if (Tenggat::untuk($jenis, $tanggal)->lessThanOrEqualTo($sekarang)) {
+                continue;
+            }
+
+            $terisi = $minggu->penugasan()->bukanIzin()->where('jenis', $jenis->value)->pluck('tugas_id')->all();
+            foreach ($this->tugasAktif($minggu, $sesi) as $t) {
+                if (! in_array($t->id, $terisi, true)) {
+                    $hasil->push(['minggu' => $minggu, 'sesi' => $sesi, 'tugas' => $t, 'tanggal' => $tanggal]);
+                }
+            }
+        }
+
+        return $hasil;
+    }
+
     /** Geng-geng non-harian minggu ini (pool Kamis). */
     public function gengKamis(MingguPiket $minggu): Collection
     {

@@ -12,6 +12,7 @@ use App\Livewire\Concerns\BeriUmpanBalik;
 use App\Livewire\Concerns\KhususPengurus;
 use App\Livewire\Concerns\PutuskanPengajuan;
 use App\Models\Geng;
+use App\Models\MingguPiket;
 use App\Models\PengajuanGantiBintang;
 use App\Models\Penugasan;
 use App\Models\Tugas;
@@ -114,6 +115,41 @@ class Pengawasan extends Component
         }
     }
 
+    // ---- R3: isi tugas yang "Belum ada petugas" ----
+
+    public function isiPetugas(int $mingguId, string $sesi, int $tugasId, $userId, JadwalMinggu $jadwal): void
+    {
+        $minggu = MingguPiket::query()->find($mingguId);
+        $tugas = Tugas::query()->find($tugasId);
+        $user = $userId ? User::query()->find((int) $userId) : null;
+        if (! $minggu || ! $tugas || ! $user) {
+            $this->toast('Pilih petugasnya dulu.', 'gagal');
+
+            return;
+        }
+
+        $this->coba(fn () => $jadwal->aturPetugasTugas($minggu, SesiTugas::from($sesi), $tugas, $user),
+            "{$tugas->nama}: {$user->namaDepan()}. Ia mendapat email.");
+    }
+
+    /** Tugas tanpa petugas di minggu ini dan minggu lalu (piket Minggu lalu masih berjalan sampai Senin 18.00). */
+    private function tanpaPetugas(JadwalMinggu $jadwal, MingguPiket $minggu, CarbonImmutable $sekarang): Collection
+    {
+        return collect([$jadwal->cari(RotasiGeng::seninDari($sekarang)->subWeek()), $minggu])
+            ->filter()
+            ->flatMap(fn (MingguPiket $m) => $jadwal->tanpaPetugas($m, $sekarang))
+            ->map(function (array $b) use ($jadwal) {
+                $baris = $b['minggu']->penugasan()->bukanIzin()->whereIn('jenis', $b['sesi']->jenisPenugasan())->whereNull('membayar_penugasan_id')->pluck('user_id')->all();
+
+                // Calon: pool sesi itu, yang belum punya tugas reguler di atas.
+                return $b + ['calon' => $jadwal->pool($b['minggu'], $b['sesi'])
+                    ->sortBy(fn (User $u) => [in_array($u->id, $baris, true) ? 1 : 0, $u->nama])
+                    ->map(fn (User $u) => ['id' => $u->id, 'nama' => $u->nama, 'sudah' => in_array($u->id, $baris, true)])
+                    ->values()];
+            })
+            ->values();
+    }
+
     // ---- Kartu cepat "Atur piket Minggu" (Tahap 2) ----
 
     public function ubahTugasMinggu(int $tugasId, bool $aktif, JadwalMinggu $jadwal): void
@@ -212,6 +248,7 @@ class Pengawasan extends Component
             },
             'statusKoreksi' => PelaksanaanPiket::STATUS_KOREKSI,
             'sedangIzin' => $izin->sedangIzin($senin, $senin->addDays(7)),
+            'tanpaPetugas' => $this->tanpaPetugas($jadwal, $minggu, $sekarang),
         ]);
     }
 

@@ -1,6 +1,6 @@
 # Piket AMKT Putri Mulawarman
 
-Sistem penjadwalan piket asrama. Spesifikasi lengkap ada di [PRD (3).md](<PRD (3).md>).
+Sistem penjadwalan piket asrama. Spesifikasi lengkap ada di [PRD (5).md](<PRD (5).md>).
 
 ## Menjalankan di lokal (XAMPP)
 
@@ -54,6 +54,7 @@ Setelah mengubah tampilan, jalankan `npm run build` (atau `npm run dev` selama m
 | --- | --- |
 | `php artisan app:create-admin` | Membuat akun Tata Tertib pertama dengan password awal (`--password=`, kalau kosong dibuat acak) |
 | `php artisan piket:jalankan` | Bintang otomatis (B4), email piket harian minggu ini, dan pengingat. Dijadwalkan tiap 15 menit |
+| `php artisan app:data-contoh` | **Khusus lokal.** Data percobaan: bintang Ping/Eca/Dilla, jadwal periode "Data contoh" dengan hari kosong, izin Adel. Aman diulang |
 
 ## Test
 

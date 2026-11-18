@@ -178,8 +178,12 @@ class JadwalHarianPeriode
     {
         $seninDepan = RotasiGeng::seninDari(CarbonImmutable::now())->addWeek();
 
+        // Hanya minggu yang bersinggungan dengan periode ini. Minggu lain (misalnya yang diisi manual
+        // tanpa periode) tidak disentuh.
         $mingguDepan = MingguPiket::query()
             ->whereDate('tanggal_senin', '>=', $seninDepan->toDateString())
+            ->whereDate('tanggal_senin', '<=', $periode->selesai()->toDateString())
+            ->whereDate('tanggal_senin', '>=', RotasiGeng::seninDari($periode->mulai())->toDateString())
             ->get();
 
         foreach ($mingguDepan as $m) {

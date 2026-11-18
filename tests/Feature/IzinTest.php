@@ -7,6 +7,7 @@ use App\Enums\SesiTugas;
 use App\Enums\StatusIzin;
 use App\Enums\StatusPenugasan;
 use App\Livewire\Pengurus\Pengajuan;
+use App\Livewire\Pengurus\Pengawasan;
 use App\Livewire\Warga\Piket;
 use App\Models\Izin;
 use App\Models\Pengaturan;
@@ -23,6 +24,7 @@ use App\Services\Tenggat;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\BuatPiket;
 use Tests\TestCase;
@@ -296,5 +298,62 @@ class IzinTest extends TestCase
         Livewire::test(Piket::class)->set('izin_mulai', '2026-11-20')->set('izin_selesai', '2026-11-21')->call('ajukanIzin')
             ->assertHasErrors(['izin_mulai', 'izin_selesai']);
         $this->assertSame(0, Izin::query()->count());
+    }
+
+    public function test_banyak_warga_boleh_izin_bersamaan_tapi_izin_satu_warga_tidak_boleh_bertumpuk(): void
+    {
+        $layanan = app(LayananIzin::class);
+        $warga = collect(range(1, 6))->map(fn ($i) => $this->warga("W{$i}", $i % 3 + 1));
+
+        // Enam warga berbeda izin di waktu yang sama: semuanya diterima, tanpa batas jumlah orang.
+        foreach ($warga as $w) {
+            $layanan->ajukan($w, $this->t('2026-11-19 08:00'), $this->t('2026-11-20 20:00'), null);
+        }
+        $this->assertSame(6, Izin::query()->count());
+
+        // Izin warga yang sama tidak boleh bertumpuk, walau hanya sebagian.
+        $this->expectException(ValidationException::class);
+        try {
+            $layanan->ajukan($warga[0], $this->t('2026-11-20 19:00'), $this->t('2026-11-21 10:00'), null);
+        } finally {
+            $this->assertSame(6, Izin::query()->count());
+            // Bersambung tanpa tumpang tindih tetap boleh.
+            $layanan->ajukan($warga[1], $this->t('2026-11-20 20:00'), $this->t('2026-11-21 10:00'), null);
+            $this->assertSame(7, Izin::query()->count());
+        }
+    }
+
+    public function test_tanpa_calon_pengganti_muncul_paling_atas_di_pengawasan_dan_bisa_diisi(): void
+    {
+        $m = $this->mingguTerbit(aktif: ['kamis' => ['WC 1']]);
+        $nivia = $this->warga('Nivia', 2);
+        $this->piket($m, $nivia, JenisPenugasan::Kamis, tugas: 'WC 1');
+        $this->izinDisetujui($nivia, '2026-11-19 07:00', '2026-11-20 20:00'); // tidak ada calon lain di pool
+        $septi = $this->warga('Septi', 3);
+
+        $html = $this->get(route('pengurus.pengawasan'))->assertSee('Belum ada petugas (1)')->assertSee('WC 1')->getContent();
+        $this->assertLessThan(strpos($html, 'Selamat'), strpos($html, 'Belum ada petugas'), 'Tampil paling atas');
+
+        Livewire::test(Pengawasan::class)
+            ->call('isiPetugas', $m->id, 'kamis', $this->tugas('WC 1')->id, $septi->id)
+            ->assertDispatched('toast', jenis: 'sukses')
+            ->assertDontSee('Belum ada petugas');
+
+        $this->assertSame($septi->id, $m->penugasan()->bukanIzin()->where('jenis', 'kamis')->sole()->user_id);
+        Notification::assertSentTo($septi, JadwalBerubah::class);
+    }
+
+    public function test_menyimpan_periode_tidak_mengubah_minggu_di_luar_periode(): void
+    {
+        $ping = $this->warga('Ping', 2);
+        // Minggu 23 Nov diisi manual (tanpa periode).
+        $manual = $this->mingguTerbit('2026-11-23', gengHarian: 2);
+        $p = $this->piket($manual, $ping, JenisPenugasan::Harian, '2026-11-24');
+
+        $periode = app(JadwalHarianPeriode::class);
+        $baru = $periode->simpanPeriode(null, 'Desember', $this->t('2026-12-07'), $this->t('2027-01-31'));
+        $periode->simpanHari($baru, []);
+
+        $this->assertNotNull($p->fresh(), 'Piket harian manual di luar periode tetap ada');
     }
 }

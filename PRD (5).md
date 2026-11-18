@@ -366,10 +366,10 @@ Bagian ini menggantikan aturan lama di bagian 3, 4, dan 5 kalau bertentangan.
 
 **R3. Izin (revisi 17 Nov malam: pakai jam; nama fitur di web cukup "Izin")**
 
-- Tabel baru `izin`: id, user_id, mulai (tanggal + jam), selesai (tanggal + jam), alasan (opsional, misalnya pulang kampung, kegiatan kampus, KKN), status (menunggu / disetujui / ditolak), dibuat_oleh_id, diputuskan_oleh_id.
+- Tabel baru `izin`: id, user_id, mulai (tanggal + jam), selesai (tanggal + jam), alasan (opsional, misalnya pulang kampung, kegiatan kampus, KKN), status (menunggu / disetujui / ditolak), dibuat_oleh_id, diputuskan_oleh_id. Izin milik satu warga tidak boleh bertumpuk waktunya (form menolak kalau bentrok dengan izinnya yang lain). Banyak warga yang berbeda boleh izin di waktu yang sama, tanpa batasan jumlah orang.
 - Pengurus bisa langsung membuat izin (langsung disetujui). Warga bisa mengajukan izin dari halaman Piket saya, lalu pengurus menyetujui atau menolak, dan warga mendapat email.
 - Selama izin disetujui, warga tidak masuk pool pembagian Kamis dan Minggu yang tanggal piketnya jatuh di rentang izin. Bintang lama miliknya juga ditunda.
-- Kalau warga sudah dapat piket yang sudah terbit lalu izinnya disetujui, piket itu berstatus **Izin** (abu-abu, tidak menjadi bintang). Sistem otomatis memilih **pengganti** dengan aturan yang sama seperti B3 langkah 2: warga di pool yang sedang di asrama, belum punya tugas reguler di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Pengganti mendapat email. Kalau tidak ada calon, tugas ditandai "Belum ada petugas" untuk diisi pengurus.
+- Kalau warga sudah dapat piket yang sudah terbit lalu izinnya disetujui, piket itu berstatus **Izin** (abu-abu, tidak menjadi bintang). Sistem otomatis memilih **pengganti** (keputusan final 18 Nov) dengan aturan yang sama seperti B3 langkah 2: warga di pool yang sedang di asrama, belum punya tugas reguler di sesi itu, dan paling lama tidak mengerjakan tugas tersebut. Pengganti mendapat email. Kalau tidak ada calon, tugas ditandai "Belum ada petugas" dan muncul paling atas di panel Pengawasan untuk diisi pengurus. Pengurus tetap bisa mengganti pengganti otomatis secara manual.
 - Untuk piket harian, hari milik warga yang izin menjadi kosong. Pengurus bisa memilih pengganti secara manual.
 - Panel Pengawasan menampilkan daftar siapa yang sedang pulang minggu ini.
 

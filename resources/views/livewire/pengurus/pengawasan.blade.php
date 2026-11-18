@@ -6,6 +6,38 @@
 @endphp
 <div class="flex flex-col gap-[26px]" x-on:gulir-ke.window="$nextTick(() => document.getElementById($event.detail.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))">
 
+    {{-- R3: tugas tanpa petugas (misalnya tidak ada calon pengganti untuk warga yang izin) tampil paling atas. --}}
+    @if ($tanpaPetugas->isNotEmpty())
+        <section class="naik flex flex-col gap-3 rounded-3xl border border-orange-300/40 bg-orange-400/[.12] p-[18px] sm:p-[22px]" aria-labelledby="judul-tanpa-petugas">
+            <div class="flex flex-col gap-0.5">
+                <h2 id="judul-tanpa-petugas" class="m-0 flex items-center gap-2 text-lg font-extrabold">
+                    <x-ikon nama="info" :ukuran="20" class="text-orange-200" />
+                    Belum ada petugas ({{ $tanpaPetugas->count() }})
+                </h2>
+                <span class="text-sm text-krem">Tidak ada calon pengganti otomatis. Pilih petugasnya; ia akan mendapat email.</span>
+            </div>
+            <div class="flex flex-col gap-2">
+                @foreach ($tanpaPetugas as $b)
+                    <div wire:key="kosong-{{ $b['minggu']->id }}-{{ $b['sesi']->value }}-{{ $b['tugas']->id }}" x-data="{ pilih: '' }"
+                         class="flex flex-wrap items-center gap-3 rounded-2xl border border-white/[.08] bg-navy/40 px-4 py-3">
+                        <div class="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+                            <span class="text-[13px] font-semibold text-rock-muda">Piket {{ $b['sesi']->label() }} · {{ $b['tanggal']->translatedFormat('l, j M') }}</span>
+                            <span class="text-base font-extrabold">{{ $b['tugas']->nama }}</span>
+                        </div>
+                        <select x-model="pilih" aria-label="Petugas untuk {{ $b['tugas']->nama }}" class="isian-gelap !min-h-[44px] !w-auto py-0 text-sm">
+                            <option value="">Pilih petugas</option>
+                            @foreach ($b['calon'] as $c)
+                                <option value="{{ $c['id'] }}">{{ $c['nama'] }}{{ $c['sudah'] ? ' (sudah ada tugas)' : '' }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="tombol-merino !min-h-[44px] text-sm" :disabled="!pilih"
+                                @click="$wire.isiPetugas({{ $b['minggu']->id }}, @js($b['sesi']->value), {{ $b['tugas']->id }}, pilih)">Isi</button>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <section class="flex flex-wrap items-stretch gap-[22px]">
         <div class="naik flex min-w-0 flex-[1_1_380px] flex-col justify-center gap-[18px]">
             <span class="kaca inline-flex items-center gap-2.5 self-start rounded-full px-3.5 py-2 text-sm font-semibold text-merino">
