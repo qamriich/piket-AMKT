@@ -8,12 +8,14 @@
         ['pengurus.jadwal', 'pengurus.jadwal|pengurus.jadwal-harian', 'Atur jadwal', 'kalender', null],
         ['pengurus.pengajuan', 'pengurus.pengajuan', 'Pengajuan', 'kotak-masuk', $jumlahPengajuan ?: null],
         ['pengurus.warga.index', 'pengurus.warga.*', 'Warga & geng', 'pengguna', null],
+        ['pengurus.bintang', 'pengurus.bintang', 'Bintang', 'utang', null],
         ['pengurus.rekap', 'pengurus.rekap', 'Rekap bulanan', 'grafik', null],
         ['pengurus.pengaturan', 'pengurus.pengaturan|pengurus.tugas.*', 'Pengaturan', 'gerigi', null],
     ];
     $aktif = fn (string $pola) => collect(explode('|', $pola))->contains(fn ($p) => request()->routeIs($p));
     $menuBawah = [$menu[0], $menu[1], $menu[2], $menu[3]];
-    $lainnyaAktif = $aktif($menu[4][1]) || $aktif($menu[5][1]);
+    $menuLainnya = array_slice($menu, 4);
+    $lainnyaAktif = collect($menuLainnya)->contains(fn ($m) => $aktif($m[1]));
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -94,7 +96,7 @@
              x-transition:enter="transition duration-300 ease-out" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
              x-transition:leave="transition duration-200 ease-in" x-transition:leave-end="translate-y-full"
              class="relative mx-2 mb-2 flex flex-col gap-1 rounded-3xl border border-white/10 bg-navy p-3 shadow-[0_-12px_40px_rgba(0,0,0,.35)]">
-            @foreach ([$menu[4], $menu[5], ['pengurus.tugas.index', 'pengurus.tugas.*', 'Master tugas', 'daftar-centang', null]] as [$rute, $pola, $label, $ikon])
+            @foreach ([...$menuLainnya, ['pengurus.tugas.index', 'pengurus.tugas.*', 'Master tugas', 'daftar-centang', null]] as [$rute, $pola, $label, $ikon])
                 <a href="{{ route($rute) }}" wire:navigate @click="lainnya = false" @if ($aktif($pola)) aria-current="page" @endif
                    class="navi flex min-h-[52px] items-center gap-3 rounded-xl px-3 text-base font-semibold text-krem no-underline">
                     <x-ikon :nama="$ikon" :ukuran="20" /> {{ $label }}

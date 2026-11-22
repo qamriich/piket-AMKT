@@ -18,7 +18,7 @@ class Penugasan extends Model
 
     protected $fillable = [
         'minggu_piket_id', 'user_id', 'tugas_id', 'jenis', 'tanggal', 'tenggat',
-        'status', 'membayar_penugasan_id', 'selesai_oleh_id', 'selesai_pada', 'catatan',
+        'status', 'manual', 'membayar_penugasan_id', 'selesai_oleh_id', 'selesai_pada', 'catatan',
         'pengingat_dikirim_pada', 'diberitahu_pada',
     ];
 
@@ -27,6 +27,7 @@ class Penugasan extends Model
         return [
             'jenis' => JenisPenugasan::class,
             'status' => StatusPenugasan::class,
+            'manual' => 'boolean',
             'tanggal' => 'immutable_date',
             'tenggat' => 'immutable_datetime',
             'selesai_pada' => 'immutable_datetime',

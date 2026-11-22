@@ -118,7 +118,7 @@ class MasterTugasDanPengaturanTest extends TestCase
         $this->assertDatabaseCount('users', 15);
         $this->assertSame(4, User::pengurus()->count());
         $this->assertSame(9, Tugas::query()->jenis(JenisTugas::Harian)->count());
-        $this->assertSame(13, Tugas::query()->jenis(JenisTugas::KamisMinggu)->count());
+        $this->assertSame(20, Tugas::query()->jenis(JenisTugas::KamisMinggu)->count()); // 13 dari PRD + 7 dari catatan bintang September
         $this->assertSame('2026-11-16', Pengaturan::ambil('minggu_acuan'));
         $this->assertSame('09:00', Pengaturan::ambil('batas_jam_kuliah'));
 

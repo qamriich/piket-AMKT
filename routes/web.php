@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/warga/baru', Pengurus\WargaForm::class)->name('warga.create');
         Route::get('/warga/{warga}/ubah', Pengurus\WargaForm::class)->name('warga.edit');
         Route::get('/tugas', Pengurus\TugasIndex::class)->name('tugas.index');
+        Route::get('/bintang', Pengurus\Bintang::class)->name('bintang');
         Route::get('/rekap', Pengurus\Rekap::class)->name('rekap');
         Route::get('/pengaturan', Pengurus\Pengaturan::class)->name('pengaturan');
     });

@@ -37,6 +37,14 @@ class TugasSeeder extends Seeder
         'Jendela kamar',
         'Garasi',
         'Lemari dapur',
+        // Ditambahkan 22 Nov 2026 dari catatan bintang September (tugas yang sudah dipakai di asrama).
+        'Jemuran atas-bawah',
+        'Rak piring',
+        'Lap cermin dalam ruang tamu + 2 kamar',
+        'Lemari ruang tamu',
+        'Kaca depan',
+        'Kaca dalam ruang tamu + 2 kamar',
+        'Jemuran',
     ];
 
     public function run(): void

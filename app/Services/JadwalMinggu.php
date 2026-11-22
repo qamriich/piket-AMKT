@@ -53,6 +53,15 @@ class JadwalMinggu
         return $minggu;
     }
 
+    /**
+     * Minggu untuk tanggal itu TANPA menerapkan jadwal harian periode. Dipakai bintang manual di minggu lampau:
+     * kalau periode ikut diterapkan, piket harian lampau akan terbentuk lalu langsung menjadi bintang (B4).
+     */
+    public function cariAtauBuatTanpaPeriode(CarbonInterface $tanggal): MingguPiket
+    {
+        return $this->cariAtauBuat(RotasiGeng::seninDari($tanggal));
+    }
+
     private function cariAtauBuat(CarbonImmutable $senin): MingguPiket
     {
         if ($ada = $this->cari($senin)) {
