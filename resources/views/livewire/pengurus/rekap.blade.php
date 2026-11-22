@@ -12,8 +12,11 @@
                 <option value="kamis">Kamis</option>
                 <option value="minggu">Minggu & kerja bakti</option>
             </select>
-            <button type="button" class="tombol-kaca" wire:click="ekspor" wire:loading.attr="disabled" wire:target="ekspor" title="Unduh CSV, bisa dibuka di Excel">
-                <x-ikon nama="unduh" :ukuran="18" /> Ekspor CSV
+            <button type="button" class="tombol-kaca" wire:click="ekspor('xlsx')" wire:loading.attr="disabled" wire:target="ekspor" title="Unduh file Excel (.xlsx)">
+                <x-ikon nama="unduh" :ukuran="18" /> Ekspor Excel
+            </button>
+            <button type="button" class="tombol-kaca" wire:click="ekspor('csv')" wire:loading.attr="disabled" wire:target="ekspor" title="Unduh CSV (pemisah titik koma)">
+                <x-ikon nama="unduh" :ukuran="18" /> CSV
             </button>
         </div>
     </div>
@@ -60,6 +63,6 @@
     </section>
     <p class="m-0 flex items-start gap-2 text-[13px] text-rock-muda">
         <x-ikon nama="info" :ukuran="16" class="mt-0.5 flex-none" />
-        Utang dihitung sampai akhir bulan yang dipilih. Ekspor ke Excel atau CSV menyusul di tahap berikutnya.
+        Utang dihitung sampai akhir bulan yang dipilih. File ekspor berisi angka yang sama dengan tabel ini, ditambah baris total.
     </p>
 </div>

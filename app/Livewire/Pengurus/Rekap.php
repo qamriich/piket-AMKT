@@ -3,6 +3,7 @@
 namespace App\Livewire\Pengurus;
 
 use App\Enums\StatusPenugasan;
+use App\Exports\RekapBulananExport;
 use App\Livewire\Concerns\KhususPengurus;
 use App\Models\LogAktivitas;
 use App\Models\Penugasan;
@@ -13,9 +14,11 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Maatwebsite\Excel\Excel as ExcelFormat;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
- * F10: rekap bulanan per warga, dengan ekspor CSV (bisa dibuka di Excel).
+ * F10: rekap bulanan per warga, dengan ekspor Excel (xlsx) atau CSV.
  */
 #[Layout('components.layouts.pengurus')]
 #[Title('Rekap bulanan')]
@@ -41,23 +44,21 @@ class Rekap extends Component
         $this->mount();
     }
 
-    /** Ekspor CSV: pemisah titik koma dan BOM UTF-8 supaya langsung rapi di Excel berbahasa Indonesia. */
-    public function ekspor()
+    /** Ekspor rekap ke Excel (xlsx) atau CSV, dengan angka yang sama persis dengan tabel di halaman. */
+    public function ekspor(string $format = 'xlsx')
     {
+        $format = $format === 'csv' ? 'csv' : 'xlsx';
         [$awal, $warga] = $this->data();
-        $nama = 'rekap-piket-'.$awal->format('Y-m').($this->jenis !== '' ? '-'.$this->jenis : '').'.csv';
+        $nama = 'rekap-piket-'.$awal->format('Y-m').($this->jenis !== '' ? '-'.$this->jenis : '').'.'.$format;
 
-        LogAktivitas::catat('rekap.ekspor', null, ['bulan' => $this->bulan, 'jenis' => $this->jenis]);
+        LogAktivitas::catat('rekap.ekspor', null, ['bulan' => $this->bulan, 'jenis' => $this->jenis, 'format' => $format]);
 
-        return response()->streamDownload(function () use ($warga) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Nama', 'Geng', 'Jumlah piket', 'Selesai', 'Bintang baru', 'Lunas', 'Utang'], ';');
-            foreach ($warga as $w) {
-                fputcsv($out, [$w['user']->nama, $w['user']->geng?->nama ?? '-', $w['terjadwal'], $w['selesai'], $w['bintang_baru'], $w['lunas'], $w['utang']], ';');
-            }
-            fclose($out);
-        }, $nama, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return Excel::download(
+            new RekapBulananExport($awal, $warga),
+            $nama,
+            $format === 'csv' ? ExcelFormat::CSV : ExcelFormat::XLSX,
+            $format === 'csv' ? ['Content-Type' => 'text/csv; charset=UTF-8'] : [],
+        );
     }
 
     /** @return array{0: CarbonImmutable, 1: Collection} */

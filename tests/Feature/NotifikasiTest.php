@@ -153,9 +153,9 @@ class NotifikasiTest extends TestCase
         $this->piket($m, $ping, JenisPenugasan::Harian, '2026-11-16', StatusPenugasan::Selesai);
         $this->masukSebagaiPengurus();
 
-        $this->get(route('pengurus.rekap'))->assertSee('Ekspor CSV')->assertDontSee('segera tersedia');
+        $this->get(route('pengurus.rekap'))->assertSee('Ekspor Excel')->assertSee('CSV')->assertDontSee('menyusul');
         Livewire::test(Rekap::class, ['bulan' => '2026-11'])
-            ->call('ekspor')
+            ->call('ekspor', 'csv')
             ->assertFileDownloaded('rekap-piket-2026-11.csv');
     }
 }
