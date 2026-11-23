@@ -22,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Di Vercel aplikasi berada di belakang proxy; header X-Forwarded-* dipercaya supaya URL dan cookie memakai https.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'pengurus' => EnsurePengurus::class,
         ]);

@@ -58,7 +58,10 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // Path relatif (misalnya resources/certs/cacert.pem untuk TiDB Cloud) dihitung dari folder aplikasi,
+                // jadi nilai yang sama berlaku di laptop dan di Vercel.
+                PDO::MYSQL_ATTR_SSL_CA => ($ca = env('MYSQL_ATTR_SSL_CA')) && ! preg_match('#^([A-Za-z]:)?[\\\\/]#', $ca)
+                    ? base_path($ca) : $ca,
             ]) : [],
         ],
 

@@ -75,6 +75,20 @@ Keamanan: tanpa secret atau dengan secret salah, route membalas 404. Route ini t
 | Railway / Render | Tanpa urus server | Butuh Dockerfile atau buildpack PHP, dan database MySQL terpisah. Cron: pakai cron bawaan platform (cara A) atau cara B. |
 | Vercel | Gratis | **Hati-hati**: runtime komunitas `vercel-php` yang dipakai PRD bagian 9 sudah diarsipkan pada 29 Okt 2026, dan Vercel kini menyarankan runtime container (Docker). Daftar ekstensi bawaan `vercel-php` juga tidak mencantumkan `gd`, padahal ekspor Excel membutuhkannya. Kalau tetap memilih Vercel, rencanakan memakai container, database terpisah (Aiven, TiDB Cloud, dll.), dan cara B. |
 
+## 4a. Deploy yang dipakai: Vercel + TiDB Cloud Serverless
+
+File yang sudah disiapkan:
+
+- `vercel.json`: runtime `vercel-php@0.7.4` (PHP 8.3) untuk `api/index.php`, build Vite (`npm run build`) dengan output `public/`, file di `/build`, `/images`, `favicon.ico`, dan `robots.txt` disajikan statis, sisanya ke Laravel.
+- `api/index.php`: memindah `storage` ke `/tmp/storage` dan cache bootstrap (config, route, package, service, event) ke `/tmp`.
+- `composer.json` → `config.platform.ext-gd`: `vercel-php` tidak punya `gd`, padahal `phpspreadsheet` mencantumkannya sebagai syarat. Ekspor rekap tidak memanggil `gd` (tanpa gambar, autosize memakai perkiraan), jadi syarat itu dipalsukan supaya `composer install` di Vercel tidak gagal.
+- `resources/certs/cacert.pem` + `MYSQL_ATTR_SSL_CA=resources/certs/cacert.pem`: TiDB Cloud wajib TLS. Path relatif dihitung dari folder aplikasi (lihat `config/database.php`).
+- `bootstrap/app.php`: `trustProxies(at: '*')` supaya URL dan cookie memakai https di belakang proxy Vercel.
+
+Variabel produksi disimpan di `.env.production` (tidak di-commit, tidak di-upload) lalu dimasukkan ke Vercel lewat `npx vercel env add`. Tambahan khusus Vercel: `LOG_CHANNEL=stderr`, `DB_PORT=4000`. Migration dan seeder dijalankan dari laptop ke TiDB. Tugas berkala memakai cara B (cron-job.org).
+
+Catatan: `vercel-php` diarsipkan pada 29 Okt 2026. Kalau suatu saat runtime ini berhenti bisa dipakai, pindah ke runtime container Vercel atau ke hosting lain di tabel atas.
+
 ## 5. Cek setelah deploy
 
 - [ ] `https://<domain-anda>/up` membalas 200.
